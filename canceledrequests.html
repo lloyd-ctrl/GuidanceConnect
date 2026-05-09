@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Canceled Requests</title>
+    <link rel="stylesheet" href="approvedrequests.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="counselorpage.html" aria-label="GuidanceConnect home">
+                <img src="logo2.png" alt="" class="brand-logo" width="44" height="44">
+                <span class="brand-text">GuidanceConnect</span>
+            </a>
+            <div class="header-meta">
+                <span class="role-pill">Counselor</span>
+                <span class="header-note">Canceled appointment requests</span>
+                <a class="btn-nav" href="counselorreqview.html">Pending Requests</a>
+                <a class="btn-nav" href="approvedrequests.html">Approved Requests</a>
+                <a class="btn-nav" href="counselorpage.html">Back to Home</a>
+                <button type="button" class="btn-nav" id="btn-logout">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="card">
+            <div class="card-header">
+                <h1>Canceled Requests</h1>
+                <p>Total canceled: <strong id="canceled-count">0</strong></p>
+            </div>
+
+            <div id="empty-state" class="empty-state" hidden>
+                No canceled requests yet.
+            </div>
+
+            <div class="table-wrap" id="table-wrap">
+                <table class="requests-table" aria-label="Canceled requests list">
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Student ID</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Concern</th>
+                            <th>Cancellation Reason</th>
+                            <th>Canceled At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="canceled-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="footer">Protected by WLC IT Department</div>
+    </main>
+
+    <script src="auth.js"></script>
+    <script>
+    (function () {
+        var APPOINTMENTS_KEY = 'guidanceconnect_appointments_v1';
+        var CANCELED_SEEN_KEY = 'guidanceconnect_canceled_seen_count_v1';
+        var session = window.GCAuth && window.GCAuth.getSession ? window.GCAuth.getSession() : null;
+        if (!session) {
+            window.location.href = 'index.html';
+            return;
+        }
+        if (session.role && session.role !== 'employee') {
+            window.location.href = 'studentpage.html';
+            return;
+        }
+
+        var logoutBtn = document.getElementById('btn-logout');
+        var countEl = document.getElementById('canceled-count');
+        var bodyEl = document.getElementById('canceled-body');
+        var emptyEl = document.getElementById('empty-state');
+        var tableWrap = document.getElementById('table-wrap');
+
+        if (logoutBtn && window.GCAuth && window.GCAuth.logout) {
+            logoutBtn.addEventListener('click', function () {
+                window.GCAuth.logout();
+                window.location.href = 'index.html';
+            });
+        }
+
+        function normalizeStatus(statusValue) {
+            var normalized = String(statusValue || 'pending').toLowerCase();
+            if (normalized === 'approve') normalized = 'approved';
+            if (normalized === 'decline') normalized = 'declined';
+            if (normalized === 'cancelled') normalized = 'canceled';
+            if (normalized !== 'pending' && normalized !== 'approved' && normalized !== 'declined' && normalized !== 'rescheduled' && normalized !== 'canceled') {
+                normalized = 'pending';
+            }
+            return normalized;
+        }
+
+        function normalizeAppointment(item, index) {
+            if (!item || typeof item !== 'object') return null;
+            return {
+                appointmentId: item.appointmentId || item.requestId || item.id || ('apt_legacy_' + index),
+                studentId: item.studentId || item.schoolId || item.studentNumber || '',
+                studentName: item.studentName || item.fullName || item.student || item.name || 'Student',
+                date: item.date || item.requestedDate || item.appointmentDate || '',
+                time: item.time || item.requestedTime || item.appointmentTime || '',
+                concern: item.concern || item.concernText || item.description || item.details || '',
+                cancellationReason: item.cancellationReason || item.cancelReason || '',
+                canceledAt: item.canceledAt || null,
+                createdAt: item.createdAt || item.requestedAt || item.submittedAt || new Date().toISOString(),
+                updatedAt: item.updatedAt || item.modifiedAt || null,
+                status: normalizeStatus(item.status)
+            };
+        }
+
+        function getAppointments() {
+            try {
+                var raw = localStorage.getItem(APPOINTMENTS_KEY);
+                var parsed = raw ? JSON.parse(raw) : [];
+                var list = Array.isArray(parsed) ? parsed : Object.keys(parsed || {}).map(function (key) { return parsed[key]; });
+                var normalized = list
+                    .map(function (item, index) { return normalizeAppointment(item, index); })
+                    .filter(function (item) { return !!item; });
+                localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(normalized));
+                return normalized;
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveAppointments(list) {
+            localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(list));
+        }
+
+        function formatReadableDate(dateStr) {
+            if (!dateStr || typeof dateStr !== 'string') return '—';
+            var parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            var dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            return isNaN(dt.getTime()) ? dateStr : dt.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function formatDateTime(ts) {
+            if (!ts) return '—';
+            var dt = new Date(ts);
+            if (isNaN(dt.getTime())) return '—';
+            return dt.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        }
+
+        function removeCanceledRequest(appointmentId) {
+            if (!appointmentId) {
+                window.alert('Unable to remove: request ID not found.');
+                return;
+            }
+
+            var appts = getAppointments();
+            var targetIndex = -1;
+            var target = null;
+            for (var i = 0; i < appts.length; i++) {
+                if (appts[i] && appts[i].appointmentId === appointmentId && appts[i].status === 'canceled') {
+                    targetIndex = i;
+                    target = appts[i];
+                    break;
+                }
+            }
+
+            if (targetIndex === -1 || !target) {
+                window.alert('This canceled request is no longer in the list.');
+                render();
+                return;
+            }
+
+            var ok = window.confirm(
+                'Remove this canceled request?\n\n' +
+                'Student: ' + (target.studentName || 'Student') + '\n' +
+                'Student ID: ' + (target.studentId || 'â€”') + '\n' +
+                'Date: ' + formatReadableDate(target.date) + '\n' +
+                'Time: ' + (target.time || 'â€”') + '\n' +
+                'Reason: ' + (target.cancellationReason || 'No reason provided')
+            );
+            if (!ok) return;
+
+            appts.splice(targetIndex, 1);
+            saveAppointments(appts);
+            render();
+        }
+
+        function render() {
+            var canceled = getAppointments()
+                .filter(function (a) { return a && a.status === 'canceled'; })
+                .sort(function (a, b) {
+                    return new Date(b.canceledAt || b.updatedAt || b.createdAt || 0).getTime() -
+                        new Date(a.canceledAt || a.updatedAt || a.createdAt || 0).getTime();
+                });
+
+            countEl.textContent = String(canceled.length);
+            bodyEl.innerHTML = '';
+
+            if (!canceled.length) {
+                emptyEl.hidden = false;
+                tableWrap.hidden = true;
+                return;
+            }
+
+            emptyEl.hidden = true;
+            tableWrap.hidden = false;
+
+            canceled.forEach(function (a) {
+                var tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td>' + (a.studentName || 'Student') + '</td>' +
+                    '<td>' + (a.studentId || '—') + '</td>' +
+                    '<td>' + formatReadableDate(a.date) + '</td>' +
+                    '<td>' + (a.time || '—') + '</td>' +
+                    '<td class="concern-cell">' + (a.concern || '—') + '</td>' +
+                    '<td class="concern-cell">' + (a.cancellationReason || 'No reason provided') + '</td>' +
+                    '<td>' + formatDateTime(a.canceledAt || a.updatedAt || a.createdAt) + '</td>';
+                var actionTd = document.createElement('td');
+                var removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'btn-remove';
+                removeBtn.textContent = 'Remove';
+                removeBtn.setAttribute('data-appointment-id', a.appointmentId || '');
+                removeBtn.addEventListener('click', function () {
+                    removeCanceledRequest(removeBtn.getAttribute('data-appointment-id'));
+                });
+                actionTd.appendChild(removeBtn);
+                tr.appendChild(actionTd);
+                bodyEl.appendChild(tr);
+            });
+
+            try {
+                localStorage.setItem(CANCELED_SEEN_KEY, String(canceled.length));
+            } catch (e) {}
+        }
+
+        window.addEventListener('storage', function (e) {
+            if (e.key === APPOINTMENTS_KEY) render();
+        });
+
+        render();
+    })();
+    </script>
+</body>
+</html>

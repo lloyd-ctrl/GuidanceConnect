@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Counselor Flow - GuidanceConnect</title>
+    <link rel="stylesheet" href="counselorpagestyle.css">
+</head>
+<body class="counselor-page">
+
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="counselorpage.html" aria-label="GuidanceConnect counselor dashboard">
+                <img src="logo2.png" alt="" class="brand-logo" width="44" height="44">
+                <span class="brand-text">GuidanceConnect</span>
+            </a>
+            <div class="header-meta">
+                <span class="role-pill">Counselor</span>
+                <span class="header-note">Counselor workflow</span>
+                <a class="btn-logout" href="counselorpage.html">Messages</a>
+                <a class="btn-logout" href="counselorreqview.html">Appointment Requests</a>
+                <button type="button" class="btn-logout" id="btn-logout">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-wrap" id="main">
+        <section class="page-intro" aria-labelledby="flow-page-heading">
+            <h1 id="flow-page-heading">Counselor Flow</h1>
+            <p class="intro-lead">
+                Manage schedule availability, appointment follow-through, session records, and case status updates.
+            </p>
+        </section>
+
+        <section class="flow-panel" aria-labelledby="flow-heading">
+            <div class="flow-head">
+                <div>
+                    <h2 id="flow-heading">Counselor Flow</h2>
+                    <p>Use these tools to manage counseling work after login.</p>
+                </div>
+                <span class="badge badge-channel">Counselor</span>
+            </div>
+
+            <ol class="flow-list">
+                <li>Manage schedule</li>
+                <li>Accept appointments</li>
+                <li>Record session details</li>
+                <li>Update case status</li>
+            </ol>
+
+            <div class="flow-tools">
+                <form class="flow-card" id="schedule-form">
+                    <h3>Manage Schedule</h3>
+                    <label for="schedule-date">Available date</label>
+                    <input type="date" id="schedule-date" required>
+                    <label for="schedule-time">Available time</label>
+                    <input type="time" id="schedule-time" required>
+                    <button type="submit" class="btn-send">Save schedule</button>
+                </form>
+
+                <div class="flow-card">
+                    <h3>Accept Appointments</h3>
+                    <p class="flow-card-copy">Review pending requests and approve, reschedule, or decline appointments.</p>
+                    <a class="btn-send flow-link" href="counselorreqview.html">Open requests</a>
+                </div>
+
+                <form class="flow-card" id="session-form">
+                    <h3>Record Session Details</h3>
+                    <label for="session-student">Student or case name</label>
+                    <input type="text" id="session-student" placeholder="Student name or case reference" required>
+                    <label for="session-notes">Session notes</label>
+                    <textarea id="session-notes" rows="3" placeholder="Write session details..." required></textarea>
+                    <button type="submit" class="btn-send">Save details</button>
+                </form>
+
+                <form class="flow-card" id="case-form">
+                    <h3>Update Case Status</h3>
+                    <label for="case-student">Student or case name</label>
+                    <input type="text" id="case-student" placeholder="Student name or case reference" required>
+                    <label for="case-status">Case status</label>
+                    <select id="case-status" required>
+                        <option value="">Choose status</option>
+                        <option value="open">Open</option>
+                        <option value="monitoring">Monitoring</option>
+                        <option value="follow-up">Needs follow-up</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                    <button type="submit" class="btn-send">Update status</button>
+                </form>
+            </div>
+
+            <p class="flow-status" id="flow-status" role="status"></p>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>Protected by WLC IT Department - Counselor use only</p>
+    </footer>
+
+    <script src="auth.js"></script>
+    <script>
+    (function () {
+        var session = window.GCAuth && window.GCAuth.getSession ? window.GCAuth.getSession() : null;
+        if (!session) {
+            window.location.href = 'index.html';
+            return;
+        }
+        if (session.role && session.role !== 'employee') {
+            window.location.href = 'studentpage.html';
+            return;
+        }
+
+        var logoutBtn = document.getElementById('btn-logout');
+        if (logoutBtn && window.GCAuth && window.GCAuth.logout) {
+            logoutBtn.addEventListener('click', function () {
+                window.GCAuth.logout();
+                window.location.href = 'index.html';
+            });
+        }
+
+        var COUNSELOR_FLOW_KEY = 'guidanceconnect_counselor_flow_v1';
+        var scheduleForm = document.getElementById('schedule-form');
+        var sessionForm = document.getElementById('session-form');
+        var caseForm = document.getElementById('case-form');
+        var flowStatus = document.getElementById('flow-status');
+
+        function getCounselorFlow() {
+            try {
+                var raw = localStorage.getItem(COUNSELOR_FLOW_KEY);
+                return raw ? JSON.parse(raw) : { schedules: [], sessions: [], cases: [] };
+            } catch (e) {
+                return { schedules: [], sessions: [], cases: [] };
+            }
+        }
+
+        function saveCounselorFlow(data) {
+            localStorage.setItem(COUNSELOR_FLOW_KEY, JSON.stringify(data));
+        }
+
+        function setFlowStatus(message) {
+            flowStatus.textContent = message;
+        }
+
+        scheduleForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var date = document.getElementById('schedule-date').value;
+            var time = document.getElementById('schedule-time').value;
+            var data = getCounselorFlow();
+            data.schedules = data.schedules || [];
+            data.schedules.push({
+                date: date,
+                time: time,
+                createdAt: new Date().toISOString()
+            });
+            saveCounselorFlow(data);
+            scheduleForm.reset();
+            setFlowStatus('Schedule saved.');
+        });
+
+        sessionForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var student = document.getElementById('session-student').value.trim();
+            var notes = document.getElementById('session-notes').value.trim();
+            var data = getCounselorFlow();
+            data.sessions = data.sessions || [];
+            data.sessions.push({
+                student: student,
+                notes: notes,
+                createdAt: new Date().toISOString()
+            });
+            saveCounselorFlow(data);
+            sessionForm.reset();
+            setFlowStatus('Session details saved.');
+        });
+
+        caseForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var student = document.getElementById('case-student').value.trim();
+            var status = document.getElementById('case-status').value;
+            var data = getCounselorFlow();
+            data.cases = data.cases || [];
+            data.cases.push({
+                student: student,
+                status: status,
+                updatedAt: new Date().toISOString()
+            });
+            saveCounselorFlow(data);
+            caseForm.reset();
+            setFlowStatus('Case status updated.');
+        });
+    })();
+    </script>
+</body>
+</html>

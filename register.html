@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Create account — GuidanceConnect</title>
+    <link rel="stylesheet" href="registerstyle.css">
+</head>
+<body>
+
+<div class="page-logos" aria-hidden="true">
+    <img src="logo1.png" alt="WLC Logo" class="logo-left">
+    <img src="logo2.png" alt="GuidanceConnect Logo" class="logo-right">
+</div>
+
+<div class="container">
+
+    <h1>GuidanceConnect</h1>
+
+    <p class="subtitle">
+        Create your account to access counseling appointments<br>
+        and secure messaging at WLC (College Department)
+    </p>
+
+    <p id="register-error" class="form-message form-message--error" role="alert" hidden></p>
+
+    <form id="register-form" class="register-form" action="#" method="post" novalidate>
+        <div class="input-box">
+            <input type="text" name="full_name" placeholder="Full name" autocomplete="name" required>
+        </div>
+
+        <div class="input-box">
+            <input type="text" name="school_id" placeholder="Student or Employee ID" autocomplete="username" required>
+        </div>
+
+        <div class="input-box">
+            <input type="email" name="email" placeholder="School email" autocomplete="email" required>
+        </div>
+
+        <div class="input-box">
+            <input type="password" id="password" name="password" placeholder="Password" autocomplete="new-password" required minlength="6">
+        </div>
+
+        <div class="input-box">
+            <input type="password" id="password_confirm" name="password_confirm" placeholder="Confirm password" autocomplete="new-password" required>
+        </div>
+
+        <div class="input-box input-select-wrap">
+            <label class="select-label" for="role">Account type</label>
+            <select id="role" name="role" class="input-select" required>
+                <option value="" disabled selected>Select one</option>
+                <option value="student">Student</option>
+                <option value="employee">Counselor</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+
+        <div class="row row-agree">
+            <label class="agree-label">
+                <input type="checkbox" name="agree" required>
+                I agree to WLC guidance data practices
+            </label>
+        </div>
+
+        <button type="submit" class="btn" id="register-submit">Create account</button>
+    </form>
+
+    <a class="btn btn-back" href="index.html">Back to sign in</a>
+
+    <div class="footer">
+        Protected by WLC IT Department
+    </div>
+
+</div>
+
+<script src="auth.js"></script>
+<script>
+(function () {
+    var form = document.getElementById('register-form');
+    var errEl = document.getElementById('register-error');
+    var submitBtn = document.getElementById('register-submit');
+
+    function showError(text) {
+        errEl.textContent = text;
+        errEl.hidden = !text;
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        showError('');
+        var fullName = form.full_name.value.trim();
+        var schoolId = form.school_id.value.trim();
+        var email = form.email.value.trim();
+        var pw = form.password.value;
+        var pw2 = form.password_confirm.value;
+        var role = form.role.value;
+
+        if (!fullName || !schoolId || !email || !role) {
+            showError('Please fill in all fields.');
+            return;
+        }
+        if (pw.length < 6) {
+            showError('Password must be at least 6 characters.');
+            return;
+        }
+        if (pw !== pw2) {
+            showError('Passwords do not match.');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        GCAuth.registerAccount({
+            fullName: fullName,
+            schoolId: schoolId,
+            email: email,
+            role: role,
+            password: pw
+        })
+            .then(function (res) {
+                if (!res.ok) {
+                    submitBtn.disabled = false;
+                    showError(res.error);
+                    return;
+                }
+                GCAuth.setFlash('Account created. Sign in with your ID and password.');
+                window.location.replace('./index.html');
+            })
+            .catch(function () {
+                submitBtn.disabled = false;
+                showError('Could not save the account. Allow storage for this site or open the project with a local server.');
+            });
+    });
+})();
+</script>
+</body>
+</html>
+

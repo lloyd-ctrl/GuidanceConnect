@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Counselor Appointment Requests</title>
+<link rel="stylesheet" href="counselorreqview.css">
+</head>
+
+<body>
+
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="counselorpage.html" aria-label="GuidanceConnect home">
+                <img src="logo2.png" alt="" class="brand-logo" width="44" height="44">
+                <span class="brand-text">GuidanceConnect</span>
+            </a>
+            <div class="header-meta">
+                <span class="role-pill">Counselor</span>
+                <span class="header-note">Appointment requests</span>
+                <a class="btn-nav" href="approvedrequests.html">Approved Requests</a>
+                <a class="btn-nav btn-back" href="counselorpage.html">Back to Counselor Dashboard</a>
+                <button type="button" class="btn-nav btn-logout" id="btn-logout">Logout</button>
+            </div>
+        </div>
+    </header>
+
+<div class="container">
+
+    <div class="notification">
+        <h3>🔔 <span id="notif-title">New Appointment Requests</span> (<span id="notif-count">0</span>)</h3>
+        <p id="notif-text">No new requests right now.</p>
+        <button class="btn-view" id="btn-view-request" type="button">View Latest ➜</button>
+    </div>
+
+    <div class="request-shell">
+    <button class="card-next-arrow card-prev-arrow" id="btn-card-prev" type="button" aria-label="Show previous appointment request" hidden>‹</button>
+    <div class="card" id="request-card">
+        <div class="card-header">Appointment Request</div>
+
+        <div class="card-body">
+            <div class="row"><span class="label">Student Name:</span> <span id="req-student-name">—</span></div>
+            <div class="row"><span class="label">Student ID:</span> <span id="req-student-id">—</span></div>
+            <div class="row"><span class="label">Concern Type:</span> <span id="req-concern-type">—</span></div>
+            <div class="row"><span class="label">Requested Date:</span> <span id="req-date">—</span></div>
+            <div class="row"><span class="label">Requested Time:</span> <span id="req-time">—</span></div>
+
+            <div class="divider"></div>
+
+            <div class="row"><strong>Student Concern:</strong></div>
+            <div class="concern" id="req-concern">—</div>
+        </div>
+
+        <div class="actions">
+            <button class="btn approve" id="btn-approve" type="button">Approve Appointment</button>
+            <button class="btn reschedule" id="btn-reschedule" type="button">Reschedule</button>
+            <button class="btn decline" id="btn-decline" type="button">Decline</button>
+        </div>
+    </div>
+    <button class="card-next-arrow" id="btn-card-next" type="button" aria-label="Show next appointment request">›</button>
+    </div>
+
+    <div class="footer">
+        Protected by WLC IT Department
+    </div>
+
+</div>
+
+<script src="auth.js"></script>
+<script>
+(function () {
+    var session = window.GCAuth && window.GCAuth.getSession ? window.GCAuth.getSession() : null;
+    if (!session) {
+        window.location.href = 'index.html';
+        return;
+    }
+    if (session.role && session.role !== 'employee') {
+        window.location.href = 'studentpage.html';
+        return;
+    }
+
+    var logoutBtn = document.getElementById('btn-logout');
+    if (logoutBtn && window.GCAuth && window.GCAuth.logout) {
+        logoutBtn.addEventListener('click', function () {
+            window.GCAuth.logout();
+            window.location.href = 'index.html';
+        });
+    }
+
+    var APPOINTMENTS_KEY = 'guidanceconnect_appointments_v1';
+
+    var notifCountEl = document.getElementById('notif-count');
+    var notifTextEl = document.getElementById('notif-text');
+    var btnViewEl = document.getElementById('btn-view-request');
+
+    var reqStudentNameEl = document.getElementById('req-student-name');
+    var reqStudentIdEl = document.getElementById('req-student-id');
+    var reqConcernTypeEl = document.getElementById('req-concern-type');
+    var reqDateEl = document.getElementById('req-date');
+    var reqTimeEl = document.getElementById('req-time');
+    var reqConcernEl = document.getElementById('req-concern');
+    var requestCardEl = document.getElementById('request-card');
+    var cardPrevBtn = document.getElementById('btn-card-prev');
+    var cardNextBtn = document.getElementById('btn-card-next');
+
+    var btnApproveEl = document.getElementById('btn-approve');
+    var btnDeclineEl = document.getElementById('btn-decline');
+    var btnRescheduleEl = document.getElementById('btn-reschedule');
+
+    var selectedAppointmentId = null;
+    var pendingCache = [];
+    var isAnimating = false;
+
+    function getSelectedIndex() {
+        if (!pendingCache.length) return -1;
+        if (!selectedAppointmentId) return 0;
+        for (var i = 0; i < pendingCache.length; i++) {
+            if (pendingCache[i].appointmentId === selectedAppointmentId) {
+                return i;
+            }
+        }
+        return 0;
+    }
+
+    function updateArrowState() {
+        var idx = getSelectedIndex();
+        var hasMultiple = pendingCache.length > 1;
+        if (cardPrevBtn) {
+            cardPrevBtn.hidden = !hasMultiple || idx <= 0;
+            cardPrevBtn.disabled = !hasMultiple || idx <= 0;
+        }
+        if (cardNextBtn) {
+            cardNextBtn.hidden = !hasMultiple;
+            cardNextBtn.disabled = !hasMultiple || idx >= pendingCache.length - 1;
+        }
+    }
+
+    var timeSlots = ['10:00', '10:30', '11:00', '11:30', '13:00', '13:30', '14:00', '14:30'];
+
+    function normalizeStatus(statusValue) {
+        var normalized = String(statusValue || 'pending').toLowerCase();
+        if (normalized === 'approve') normalized = 'approved';
+        if (normalized === 'decline') normalized = 'declined';
+        if (normalized === 'cancelled') normalized = 'canceled';
+        if (normalized !== 'pending' && normalized !== 'approved' && normalized !== 'declined' && normalized !== 'rescheduled' && normalized !== 'canceled') {
+            normalized = 'pending';
+        }
+        return normalized;
+    }
+
+    function normalizeAppointment(item, index) {
+        if (!item || typeof item !== 'object') return null;
+        return {
+            appointmentId: item.appointmentId || item.requestId || item.id || ('apt_legacy_' + index),
+            studentId: item.studentId || item.schoolId || item.studentNumber || '',
+            studentName: item.studentName || item.fullName || item.student || item.name || 'Student',
+            date: item.date || item.requestedDate || item.appointmentDate || '',
+            time: item.time || item.requestedTime || item.appointmentTime || '',
+            concern: item.concern || item.concernText || item.description || item.details || '',
+            cancellationReason: item.cancellationReason || item.cancelReason || '',
+            canceledAt: item.canceledAt || null,
+            createdAt: item.createdAt || item.requestedAt || item.submittedAt || new Date().toISOString(),
+            updatedAt: item.updatedAt || item.modifiedAt || null,
+            approvedAt: item.approvedAt || null,
+            status: normalizeStatus(item.status)
+        };
+    }
+
+    function getAppointments() {
+        try {
+            var raw = localStorage.getItem(APPOINTMENTS_KEY);
+            var parsed = raw ? JSON.parse(raw) : [];
+            var list = Array.isArray(parsed) ? parsed : Object.keys(parsed || {}).map(function (key) { return parsed[key]; });
+            var normalized = list
+                .map(function (item, index) { return normalizeAppointment(item, index); })
+                .filter(function (item) { return !!item; });
+            localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(normalized));
+            return normalized;
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveAppointments(list) {
+        localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(list));
+    }
+
+    function formatReadableDate(dateStr) {
+        // dateStr is YYYY-MM-DD
+        if (!dateStr || typeof dateStr !== 'string') return '—';
+        var parts = dateStr.split('-');
+        if (parts.length !== 3) return dateStr;
+        var y = parseInt(parts[0], 10);
+        var m = parseInt(parts[1], 10) - 1;
+        var d = parseInt(parts[2], 10);
+        var dt = new Date(y, m, d);
+        try {
+            return dt.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        } catch (e) {
+            return dateStr;
+        }
+    }
+
+    function concernTypeFromText(concernText) {
+        // Simple heuristic: treat as “Counseling” for now.
+        return concernText && concernText.trim() ? 'Student Concern' : 'Counseling';
+    }
+
+    function render() {
+        var appts = getAppointments();
+        pendingCache = appts
+            .filter(function (a) { return a && a.status === 'pending'; })
+            .sort(function (a, b) {
+                // newer first
+                return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+            });
+
+        notifCountEl.textContent = String(pendingCache.length);
+
+        if (!pendingCache.length) {
+            notifTextEl.textContent = 'No new requests right now.';
+            btnViewEl.disabled = true;
+            updateArrowState();
+            selectedAppointmentId = null;
+            reqStudentNameEl.textContent = '—';
+            reqStudentIdEl.textContent = '—';
+            reqConcernTypeEl.textContent = '—';
+            reqDateEl.textContent = '—';
+            reqTimeEl.textContent = '—';
+            reqConcernEl.textContent = '—';
+            return;
+        }
+
+        notifTextEl.textContent = 'A student has requested a counseling appointment.';
+        btnViewEl.disabled = false;
+        // Keep current selection if it still exists; otherwise pick the latest.
+        var selected = null;
+        if (selectedAppointmentId) {
+            selected = pendingCache.find(function (p) { return p.appointmentId === selectedAppointmentId; });
+        }
+        if (!selected) selected = pendingCache[0];
+
+        selectedAppointmentId = selected.appointmentId;
+
+        reqStudentNameEl.textContent = selected.studentName || 'Student';
+        reqStudentIdEl.textContent = selected.studentId || '—';
+        reqConcernTypeEl.textContent = concernTypeFromText(selected.concern);
+        reqDateEl.textContent = formatReadableDate(selected.date);
+        reqTimeEl.textContent = selected.time || '—';
+        reqConcernEl.textContent = selected.concern || '—';
+        updateArrowState();
+    }
+
+    function selectRelativePending(step) {
+        if (!pendingCache.length) return false;
+        var idx = getSelectedIndex();
+        var nextIdx = idx + step;
+        if (nextIdx < 0 || nextIdx >= pendingCache.length) return false;
+        selectedAppointmentId = pendingCache[nextIdx].appointmentId;
+        return true;
+    }
+
+    function pickNext() {
+        if (!selectRelativePending(1)) return;
+        render();
+    }
+
+    function pickPrevious() {
+        if (!selectRelativePending(-1)) return;
+        render();
+    }
+
+    function animateCard(step) {
+        if (isAnimating || !requestCardEl || pendingCache.length < 2) return;
+        if (!selectRelativePending(step)) return;
+        isAnimating = true;
+        requestCardEl.classList.remove('is-slide-in', 'is-slide-in-left', 'is-slide-out');
+        void requestCardEl.offsetWidth;
+        requestCardEl.classList.add('is-slide-out');
+
+        window.setTimeout(function () {
+            render();
+            requestCardEl.classList.remove('is-slide-out');
+            requestCardEl.classList.add(step > 0 ? 'is-slide-in' : 'is-slide-in-left');
+
+            window.setTimeout(function () {
+                requestCardEl.classList.remove('is-slide-in', 'is-slide-in-left');
+                isAnimating = false;
+            }, 320);
+        }, 220);
+    }
+
+    function updateSelectedStatus(nextStatus, extra) {
+        if (!selectedAppointmentId) return;
+        var appts = getAppointments();
+        var updated = false;
+        for (var i = 0; i < appts.length; i++) {
+            var a = appts[i];
+            if (a && a.appointmentId === selectedAppointmentId) {
+                a.status = nextStatus;
+                if (nextStatus === 'approved') {
+                    a.approvedAt = new Date().toISOString();
+                }
+                if (extra) {
+                    Object.keys(extra).forEach(function (k) { a[k] = extra[k]; });
+                }
+                a.updatedAt = new Date().toISOString();
+                updated = true;
+                break;
+            }
+        }
+        if (updated) saveAppointments(appts);
+        render();
+    }
+
+    btnViewEl.addEventListener('click', function () {
+        // “View Latest” acts as cycling the pending requests.
+        pickNext();
+    });
+
+    if (cardNextBtn) {
+        cardNextBtn.addEventListener('click', function () {
+            animateCard(1);
+        });
+    }
+
+    if (cardPrevBtn) {
+        cardPrevBtn.addEventListener('click', function () {
+            animateCard(-1);
+        });
+    }
+
+    btnApproveEl.addEventListener('click', function () {
+        updateSelectedStatus('approved');
+    });
+
+    btnDeclineEl.addEventListener('click', function () {
+        updateSelectedStatus('declined');
+    });
+
+    btnRescheduleEl.addEventListener('click', function () {
+        if (!selectedAppointmentId) return;
+        var newDate = window.prompt('Enter new requested date (YYYY-MM-DD):', '');
+        if (!newDate) return;
+        var newTime = window.prompt('Enter new requested time (10:00, 10:30, ...):', '');
+        if (!newTime) return;
+
+        newTime = String(newTime).trim();
+        if (timeSlots.indexOf(newTime) === -1) {
+            window.alert('Invalid time slot.');
+            return;
+        }
+
+        updateSelectedStatus('rescheduled', {
+            date: newDate,
+            time: newTime
+        });
+    });
+
+    window.addEventListener('storage', function (e) {
+        if (e.key === APPOINTMENTS_KEY) {
+            render();
+        }
+    });
+
+    render();
+})();
+</script>
+
+</body>
+</html>

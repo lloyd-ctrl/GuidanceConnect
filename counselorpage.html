@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Counselor Dashboard - GuidanceConnect</title>
+    <link rel="stylesheet" href="counselorpagestyle.css">
+</head>
+<body class="counselor-page">
+
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="index.html" aria-label="GuidanceConnect home">
+                <img src="logo2.png" alt="" class="brand-logo" width="44" height="44">
+                <span class="brand-text">GuidanceConnect</span>
+            </a>
+            <div class="header-meta">
+                <span class="role-pill">Counselor</span>
+                <span class="header-note">Counseling office console</span>
+                <a class="btn-logout" href="counselorflow.html">Counselor Flow</a>
+                <a class="btn-logout btn-canceled-link" href="canceledrequests.html">
+                    Canceled Requests
+                    <span class="btn-count-badge" id="canceled-count-badge" hidden>0</span>
+                </a>
+                <button type="button" class="btn-logout" id="btn-logout">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-wrap" id="main">
+        <section class="page-intro" aria-labelledby="intro-heading">
+            <h1 id="intro-heading">Student messages</h1>
+            <p class="intro-lead">
+                Reply to students through the secure channel. Conversations stay within authorized counseling workflows.
+            </p>
+        </section>
+
+        <div class="counselor-layout">
+            <aside class="inbox-panel" aria-label="Student inbox">
+                <a class="btn btn-appointments btn-appointments-link" href="counselorreqview.html">
+                    Appointment Requests
+                    <span class="btn-count-badge" id="pending-count-badge" hidden>0</span>
+                </a>
+                <p class="inbox-hint">Open requests, approve or reschedule from the appointments page.</p>
+
+                <h2 class="inbox-title">Inbox</h2>
+                <ul class="inbox-list" id="inbox-list" role="listbox" aria-label="Students">
+                    <!-- items filled / updated by script -->
+                </ul>
+            </aside>
+
+            <section class="chat-panel" aria-labelledby="active-student-heading">
+                <div class="chat-panel-head">
+                    <div>
+                        <h2 id="active-student-heading" class="active-name"><span id="active-student-name">—</span></h2>
+                        <p class="active-meta" id="active-student-meta"></p>
+                    </div>
+                    <span class="badge badge-channel">Secure channel</span>
+                </div>
+
+                <div class="chat-thread" id="chat-thread" role="log" aria-live="polite" aria-relevant="additions"></div>
+
+                <form class="chat-compose" id="chat-form" novalidate>
+                    <label class="sr-only" for="chat-input">Reply to student</label>
+                    <textarea id="chat-input" class="chat-input" rows="2" placeholder="Write a reply to the student…" required autocomplete="off"></textarea>
+                    <div class="compose-actions">
+                        <button type="submit" class="btn btn-send">Send reply</button>
+                        <button type="button" id="btn-clear-chat" class="btn btn-clear">Clear messages</button>
+                        <span class="compose-note">Delivered as Guidance Counselor</span>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <p>Protected by WLC IT Department - Counselor use only</p>
+    </footer>
+
+    <script src="auth.js"></script>
+    <script>
+    (function () {
+        var session = window.GCAuth && window.GCAuth.getSession ? window.GCAuth.getSession() : null;
+        if (!session) {
+            window.location.href = 'index.html';
+            return;
+        }
+        if (session.role && session.role !== 'employee') {
+            window.location.href = 'studentpage.html';
+            return;
+        }
+
+        var logoutBtn = document.getElementById('btn-logout');
+        if (logoutBtn && window.GCAuth && window.GCAuth.logout) {
+            logoutBtn.addEventListener('click', function () {
+                window.GCAuth.logout();
+                window.location.href = 'index.html';
+            });
+        }
+
+        var CHAT_KEY = 'guidanceconnect_chat_v1';
+        var APPOINTMENTS_KEY = 'guidanceconnect_appointments_v1';
+        var ACCOUNTS_KEY = 'guidanceconnect_accounts_v1';
+        var CANCELED_SEEN_KEY = 'guidanceconnect_canceled_seen_count_v1';
+        var canceledCountBadge = document.getElementById('canceled-count-badge');
+        var pendingCountBadge = document.getElementById('pending-count-badge');
+        var listEl = document.getElementById('inbox-list');
+        var threadEl = document.getElementById('chat-thread');
+        var form = document.getElementById('chat-form');
+        var input = document.getElementById('chat-input');
+        var clearBtn = document.getElementById('btn-clear-chat');
+        var nameEl = document.getElementById('active-student-name');
+        var metaEl = document.getElementById('active-student-meta');
+        var activeId = null;
+
+        function nowLabel(dateValue) {
+            var d = dateValue ? new Date(dateValue) : new Date();
+            return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        }
+
+        function getThreads() {
+            try {
+                var raw = localStorage.getItem(CHAT_KEY);
+                return raw ? JSON.parse(raw) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveThreads(threads) {
+            localStorage.setItem(CHAT_KEY, JSON.stringify(threads));
+        }
+
+        function getAccounts() {
+            try {
+                var raw = localStorage.getItem(ACCOUNTS_KEY);
+                return raw ? JSON.parse(raw) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function normalizeStatus(statusValue) {
+            var normalized = String(statusValue || 'pending').toLowerCase();
+            if (normalized === 'approve') normalized = 'approved';
+            if (normalized === 'decline') normalized = 'declined';
+            if (normalized === 'cancelled') normalized = 'canceled';
+            if (normalized !== 'pending' && normalized !== 'approved' && normalized !== 'declined' && normalized !== 'rescheduled' && normalized !== 'canceled') {
+                normalized = 'pending';
+            }
+            return normalized;
+        }
+
+        function getAppointments() {
+            try {
+                var raw = localStorage.getItem(APPOINTMENTS_KEY);
+                var parsed = raw ? JSON.parse(raw) : [];
+                var list = Array.isArray(parsed) ? parsed : Object.keys(parsed || {}).map(function (key) { return parsed[key]; });
+                return list.filter(function (item) { return item && typeof item === 'object'; }).map(function (item) {
+                    item.status = normalizeStatus(item.status);
+                    return item;
+                });
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function renderCanceledBadge() {
+            if (!canceledCountBadge) return;
+            var count = getAppointments().filter(function (item) {
+                return item.status === 'canceled';
+            }).length;
+            var seenCount = 0;
+            try {
+                seenCount = parseInt(localStorage.getItem(CANCELED_SEEN_KEY) || '0', 10) || 0;
+            } catch (e) {
+                seenCount = 0;
+            }
+            canceledCountBadge.textContent = String(count);
+            canceledCountBadge.hidden = count < 1;
+            canceledCountBadge.classList.toggle('is-seen', count > 0 && count <= seenCount);
+        }
+
+        function renderPendingBadge() {
+            if (!pendingCountBadge) return;
+            var count = getAppointments().filter(function (item) {
+                return item.status === 'pending';
+            }).length;
+            pendingCountBadge.textContent = String(count);
+            pendingCountBadge.hidden = count < 1;
+        }
+
+        function getStudents() {
+            var accounts = getAccounts();
+            var threads = getThreads();
+            var byId = {};
+            var i;
+            var keys;
+
+            for (i = 0; i < accounts.length; i++) {
+                if (accounts[i].role === 'student') {
+                    byId[accounts[i].schoolId] = {
+                        id: accounts[i].schoolId,
+                        name: accounts[i].fullName || 'Student',
+                        idLabel: 'ID ' + accounts[i].schoolId
+                    };
+                }
+            }
+
+            keys = Object.keys(threads);
+            for (i = 0; i < keys.length; i++) {
+                if (!byId[keys[i]]) {
+                    var isAnonymousVisitor = threads[keys[i]].anonymous || keys[i].indexOf('anonymous_visitor_') === 0;
+                    byId[keys[i]] = {
+                        id: keys[i],
+                        name: isAnonymousVisitor ? 'Anonymous Visitor' : (threads[keys[i]].studentName || 'Student'),
+                        idLabel: isAnonymousVisitor ? '' : ('ID ' + keys[i])
+                    };
+                }
+            }
+
+            return Object.keys(byId).map(function (k) {
+                return byId[k];
+            });
+        }
+
+        function previewFor(studentId) {
+            var t = getThreads()[studentId];
+            if (!t || !t.messages || !t.messages.length) return 'No messages yet';
+            return t.messages[t.messages.length - 1].text;
+        }
+
+        function msgNode(m) {
+            var wrap = document.createElement('div');
+            var isCounselor = m.sender === 'counselor' || m.sender === 'staff';
+            wrap.className = 'msg ' + (isCounselor ? 'msg-counselor' : 'msg-student');
+            var label = document.createElement('span');
+            label.className = 'msg-label';
+            label.textContent = isCounselor ? 'You (Guidance Counselor)' : 'Student';
+            var body = document.createElement('p');
+            body.className = 'msg-body';
+            body.textContent = m.text;
+            var time = document.createElement('time');
+            time.className = 'msg-time';
+            time.textContent = nowLabel(m.at);
+            wrap.appendChild(label);
+            wrap.appendChild(body);
+            wrap.appendChild(time);
+            return wrap;
+        }
+
+        function renderThread() {
+            var threads = getThreads();
+            var t = activeId ? threads[activeId] : null;
+            threadEl.innerHTML = '';
+            if (!t || !t.messages) return;
+            t.messages.forEach(function (m) {
+                threadEl.appendChild(msgNode(m));
+            });
+            threadEl.scrollTop = threadEl.scrollHeight;
+        }
+
+        function setActive(id, students) {
+            activeId = id;
+            var match = null;
+            var i;
+            for (i = 0; i < students.length; i++) {
+                if (students[i].id === id) {
+                    match = students[i];
+                    break;
+                }
+            }
+            nameEl.textContent = match ? match.name : 'Student';
+            metaEl.textContent = match ? match.idLabel : '';
+            [].forEach.call(listEl.querySelectorAll('.inbox-item'), function (li) {
+                li.classList.toggle('is-active', li.getAttribute('data-id') === id);
+                li.setAttribute('aria-selected', li.getAttribute('data-id') === id ? 'true' : 'false');
+            });
+            renderThread();
+            input.focus();
+        }
+
+        function buildInbox() {
+            var students = getStudents();
+            listEl.innerHTML = '';
+
+            if (!students.length) {
+                var empty = document.createElement('li');
+                empty.className = 'inbox-item';
+                empty.textContent = 'No student conversations yet.';
+                listEl.appendChild(empty);
+                nameEl.textContent = '-';
+                metaEl.textContent = '';
+                threadEl.innerHTML = '';
+                activeId = null;
+                return;
+            }
+
+            students.forEach(function (s) {
+                var li = document.createElement('li');
+                li.className = 'inbox-item';
+                li.setAttribute('data-id', s.id);
+                li.setAttribute('role', 'option');
+                li.setAttribute('tabindex', '0');
+                li.innerHTML =
+                    '<span class="inbox-item-name">' + s.name + '</span>' +
+                    '<span class="inbox-item-preview"></span>';
+                li.querySelector('.inbox-item-preview').textContent = previewFor(s.id);
+                li.addEventListener('click', function () { setActive(s.id, students); });
+                li.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setActive(s.id, students);
+                    }
+                });
+                listEl.appendChild(li);
+            });
+
+            if (!activeId || !students.some(function (s) { return s.id === activeId; })) {
+                setActive(students[0].id, students);
+            } else {
+                setActive(activeId, students);
+            }
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            if (!activeId) return;
+            var text = (input.value || '').trim();
+            var threads;
+            if (!text) return;
+            threads = getThreads();
+            if (!threads[activeId]) {
+                threads[activeId] = { schoolId: activeId, studentName: nameEl.textContent, messages: [] };
+            }
+            threads[activeId].messages = threads[activeId].messages || [];
+            threads[activeId].messages.push({
+                sender: 'counselor',
+                text: text,
+                at: new Date().toISOString()
+            });
+            saveThreads(threads);
+            input.value = '';
+            buildInbox();
+            renderThread();
+        });
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                if (!activeId) return;
+                var ok = window.confirm('Clear messages for this student conversation?');
+                if (!ok) return;
+                var threads = getThreads();
+                if (!threads[activeId]) {
+                    threads[activeId] = { schoolId: activeId, studentName: metaEl.textContent || 'Student', messages: [] };
+                }
+                threads[activeId].messages = [];
+                saveThreads(threads);
+                buildInbox();
+                renderThread();
+            });
+        }
+
+        window.addEventListener('storage', function (e) {
+            if (e.key === CHAT_KEY || e.key === ACCOUNTS_KEY) {
+                buildInbox();
+            }
+            if (e.key === APPOINTMENTS_KEY || e.key === CANCELED_SEEN_KEY) {
+                renderCanceledBadge();
+                renderPendingBadge();
+            }
+        });
+
+        buildInbox();
+        renderCanceledBadge();
+        renderPendingBadge();
+    })();
+    </script>
+</body>
+</html>

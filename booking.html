@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book Appointment</title>
+<link rel="stylesheet" href="booking.css">
+</head>
+
+<body class="page-booking">
+
+<header class="site-header">
+    <div class="header-inner">
+        <a class="brand" href="index.html" aria-label="GuidanceConnect home">
+            <img src="logo2.png" alt="" class="brand-logo" width="44" height="44">
+            <span class="brand-text">GuidanceConnect</span>
+        </a>
+        <nav class="header-actions" aria-label="Account">
+            <a class="btn-home" href="./studentpage.html">Home</a>
+            <span class="header-greet">Welcome, <span id="header-student-name" class="header-student-name">Student</span></span>
+            <button type="button" id="btn-logout" class="btn-logout">Logout</button>
+        </nav>
+    </div>
+</header>
+
+<main class="main-wrap">
+<div class="container booking-container">
+
+    <img src="logo2.png" alt="GuidanceConnect" class="logo">
+
+    <h1>GuidanceConnect</h1>
+    <div class="subtitle">
+        A Secure Online Appointment and Case Management System for Student Counseling at WCCC
+    </div>
+
+    <div class="card booking-card">
+
+        <h2>Book an Appointment</h2>
+        <p class="booking-intro">Choose a date, then pick an available time slot.</p>
+
+        <section class="booking-section" aria-labelledby="cal-heading">
+            <h3 id="cal-heading" class="booking-section-title">Select date</h3>
+            <div class="calendar-toolbar">
+                <button type="button" class="cal-nav" id="cal-prev" aria-label="Previous week">◀ Previous</button>
+                <div class="cal-range" id="cal-range" aria-live="polite"></div>
+                <button type="button" class="cal-nav" id="cal-next" aria-label="Next week">Next ▶</button>
+            </div>
+            <div class="calendar-table-wrap">
+                <table class="calendar-grid" role="grid" aria-label="Week calendar">
+                    <thead>
+                        <tr>
+                            <th scope="col">Sun</th>
+                            <th scope="col">Mon</th>
+                            <th scope="col">Tue</th>
+                            <th scope="col">Wed</th>
+                            <th scope="col">Thu</th>
+                            <th scope="col">Fri</th>
+                            <th scope="col">Sat</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id="cal-week-row"></tr>
+                    </tbody>
+                </table>
+            </div>
+            <p class="cal-selected-label">Selected: <strong id="cal-selected-display"></strong></p>
+        </section>
+
+        <section class="booking-section" aria-labelledby="slots-heading">
+            <h3 id="slots-heading" class="booking-section-title">Available times</h3>
+            <div class="slots-landscape-wrap" aria-label="Available time slots">
+                <div id="slot-container" class="slots-landscape" role="radiogroup" aria-label="Select a time"></div>
+            </div>
+        </section>
+
+        <label for="concern"><strong>Type of Concern (Private)</strong></label>
+        <textarea id="concern" class="textarea" rows="4" placeholder="Describe your concern..."></textarea>
+
+    </div>
+
+    <button type="button" class="btn" id="btn-confirm">Confirm Appointment</button>
+
+    <div class="footer">
+        Protected by WLC IT Department
+    </div>
+
+</div>
+</main>
+
+<script src="auth.js"></script>
+<script>
+(function () {
+    var nameEl = document.getElementById('header-student-name');
+    var logoutBtn = document.getElementById('btn-logout');
+    var weekStart = new Date();
+    weekStart.setHours(12, 0, 0, 0);
+    while (weekStart.getDay() !== 0) weekStart.setDate(weekStart.getDate() - 1);
+
+    var selected = new Date();
+    selected.setHours(12, 0, 0, 0);
+    while (selected.getDay() === 0 || selected.getDay() === 6) {
+        selected.setDate(selected.getDate() + 1);
+    }
+
+    var slots = [
+        { t: '10:00', label: '10:00 AM' },
+        { t: '10:30', label: '10:30 AM' },
+        { t: '11:00', label: '11:00 AM' },
+        { t: '11:30', label: '11:30 AM' },
+        { t: '13:00', label: '1:00 PM' },
+        { t: '13:30', label: '1:30 PM' },
+        { t: '14:00', label: '2:00 PM' },
+        { t: '14:30', label: '2:30 PM' }
+    ];
+
+    var APPOINTMENTS_KEY = 'guidanceconnect_appointments_v1';
+    var session = typeof GCAuth !== 'undefined' ? GCAuth.getSession() : null;
+    if (!session) {
+        window.location.replace('./index.html');
+        return;
+    }
+    var studentId = session && session.schoolId ? session.schoolId : null;
+    var studentName = session && session.fullName ? session.fullName : 'Student';
+
+    if (nameEl) {
+        nameEl.textContent = studentName;
+    }
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function () {
+            if (typeof GCAuth !== 'undefined') {
+                GCAuth.logout();
+            }
+            window.location.replace('./index.html');
+        });
+    }
+
+    function normalizeStatus(statusValue) {
+        var normalized = String(statusValue || 'pending').toLowerCase();
+        if (normalized === 'approve') normalized = 'approved';
+        if (normalized === 'decline') normalized = 'declined';
+        if (normalized === 'cancelled') normalized = 'canceled';
+        if (normalized !== 'pending' && normalized !== 'approved' && normalized !== 'declined' && normalized !== 'rescheduled' && normalized !== 'canceled') {
+            normalized = 'pending';
+        }
+        return normalized;
+    }
+
+    function normalizeAppointment(item, index) {
+        if (!item || typeof item !== 'object') return null;
+        return {
+            appointmentId: item.appointmentId || item.requestId || item.id || ('apt_legacy_' + index),
+            studentId: item.studentId || item.schoolId || item.studentNumber || '',
+            studentName: item.studentName || item.fullName || item.student || item.name || 'Student',
+            date: item.date || item.requestedDate || item.appointmentDate || '',
+            time: item.time || item.requestedTime || item.appointmentTime || '',
+            concern: item.concern || item.concernText || item.description || item.details || '',
+            cancellationReason: item.cancellationReason || item.cancelReason || '',
+            canceledAt: item.canceledAt || null,
+            createdAt: item.createdAt || item.requestedAt || item.submittedAt || new Date().toISOString(),
+            updatedAt: item.updatedAt || item.modifiedAt || null,
+            approvedAt: item.approvedAt || null,
+            status: normalizeStatus(item.status)
+        };
+    }
+
+    function getAppointments() {
+        try {
+            var raw = localStorage.getItem(APPOINTMENTS_KEY);
+            var parsed = raw ? JSON.parse(raw) : [];
+            var list = Array.isArray(parsed) ? parsed : Object.keys(parsed || {}).map(function (key) { return parsed[key]; });
+            var normalized = list
+                .map(function (item, index) { return normalizeAppointment(item, index); })
+                .filter(function (item) { return !!item; });
+            localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(normalized));
+            return normalized;
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveAppointments(list) {
+        localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(list));
+    }
+
+    var appointments = getAppointments();
+
+    function formatLocalDateISO(d) {
+        var y = d.getFullYear();
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + day;
+    }
+
+    function sameDay(a, b) {
+        return a.getFullYear() === b.getFullYear() &&
+            a.getMonth() === b.getMonth() &&
+            a.getDate() === b.getDate();
+    }
+
+    function formatLong(d) {
+        return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatRange(start) {
+        var end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        var opts = { month: 'short', day: 'numeric' };
+        return start.toLocaleDateString('en-US', opts) + ' – ' + end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function isWeekend(d) {
+        var day = d.getDay();
+        return day === 0 || day === 6;
+    }
+
+    /** Deterministic “booked” demo (fallback when no saved requests exist). */
+    function deterministicBooked(date, slotT) {
+        if (isWeekend(date)) return true;
+        var seed = date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+        var h = (seed + slotT.charCodeAt(0) * 7) % 5;
+        return h === 0;
+    }
+
+    /** Real booked check based on localStorage appointment requests. */
+    function isBooked(date, slotT) {
+        if (isWeekend(date)) return true;
+
+        var dateStr = formatLocalDateISO(date);
+        var i;
+        for (i = 0; i < appointments.length; i++) {
+            var a = appointments[i];
+            if (!a) continue;
+            if ((a.status === 'pending' || a.status === 'approved') && a.date === dateStr && a.time === slotT) {
+                return true;
+            }
+        }
+
+        // If no saved requests yet, keep the existing demo behavior.
+        if (!appointments.length) return deterministicBooked(date, slotT);
+        return false;
+    }
+
+    var selectedTime = null;
+
+    function renderWeek() {
+        var row = document.getElementById('cal-week-row');
+        row.innerHTML = '';
+        document.getElementById('cal-range').textContent = formatRange(weekStart);
+
+        for (var i = 0; i < 7; i++) {
+            var d = new Date(weekStart);
+            d.setDate(weekStart.getDate() + i);
+            var td = document.createElement('td');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'cal-day-btn';
+            btn.setAttribute('aria-pressed', sameDay(d, selected) ? 'true' : 'false');
+            if (sameDay(d, selected)) btn.classList.add('is-selected');
+            if (isWeekend(d)) {
+                btn.classList.add('is-muted');
+                btn.disabled = true;
+                btn.title = 'No appointments on weekends';
+            }
+            btn.textContent = String(d.getDate());
+            btn.dataset.date = d.toISOString().slice(0, 10);
+            (function (dateCopy) {
+                btn.addEventListener('click', function () {
+                    if (isWeekend(dateCopy)) return;
+                    selected = new Date(dateCopy);
+                    selected.setHours(12, 0, 0, 0);
+                    selectedTime = null;
+                    renderWeek();
+                    renderSlots();
+                    updateSelectedLabel();
+                });
+            })(new Date(d));
+            td.appendChild(btn);
+            row.appendChild(td);
+        }
+        updateSelectedLabel();
+    }
+
+    function updateSelectedLabel() {
+        document.getElementById('cal-selected-display').textContent = formatLong(selected);
+    }
+
+    function renderSlots() {
+        var container = document.getElementById('slot-container');
+        if (!container) return;
+
+        container.innerHTML = '';
+        for (var i = 0; i < slots.length; i++) {
+            var s = slots[i];
+            var booked = isBooked(selected, s.t);
+            var isSelected = !booked && selectedTime === s.t;
+
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'slot-btn' + (booked ? ' is-booked' : '') + (isSelected ? ' is-selected' : '');
+            btn.setAttribute('role', 'radio');
+            btn.setAttribute('aria-checked', isSelected ? 'true' : 'false');
+            btn.textContent = s.label;
+
+            if (booked) {
+                btn.disabled = true;
+                btn.title = 'Booked';
+            } else {
+                (function (timeKey) {
+                    btn.addEventListener('click', function () {
+                        selectedTime = timeKey;
+                        renderSlots();
+                    });
+                })(s.t);
+            }
+
+            container.appendChild(btn);
+        }
+    }
+
+    document.getElementById('cal-prev').addEventListener('click', function () {
+        weekStart.setDate(weekStart.getDate() - 7);
+        renderWeek();
+        renderSlots();
+    });
+    document.getElementById('cal-next').addEventListener('click', function () {
+        weekStart.setDate(weekStart.getDate() + 7);
+        renderWeek();
+        renderSlots();
+    });
+
+    document.getElementById('btn-confirm').addEventListener('click', function () {
+        if (isWeekend(selected)) {
+            alert('Please choose a weekday.');
+            return;
+        }
+        if (!selectedTime) {
+            alert('Please select an available time slot.');
+            return;
+        }
+        if (!studentId) {
+            alert('Please sign in first to book an appointment.');
+            return;
+        }
+        var concern = document.getElementById('concern').value.trim();
+        if (!concern) {
+            alert('Please briefly describe your concern.');
+            return;
+        }
+
+        var slotLabel = slots.filter(function (x) { return x.t === selectedTime; })[0].label;
+
+        var dateStr = formatLocalDateISO(selected);
+        var duplicate = appointments.some(function (a) {
+            return a && a.studentId === studentId && a.status === 'pending' && a.date === dateStr && a.time === selectedTime;
+        });
+
+        if (duplicate) {
+            alert('You already requested this appointment slot.\n\nPlease select a different time.');
+            return;
+        }
+
+        var appointmentId = 'apt_' + Math.random().toString(16).slice(2) + '_' + Date.now();
+        appointments.push({
+            appointmentId: appointmentId,
+            studentId: studentId,
+            studentName: studentName,
+            date: dateStr,
+            time: selectedTime,
+            concern: concern,
+            createdAt: new Date().toISOString(),
+            status: 'pending'
+        });
+        saveAppointments(appointments);
+
+        // Refresh slot availability after saving.
+        renderSlots();
+
+        alert(
+            'Appointment request recorded:\n' +
+                formatLong(selected) +
+                ' at ' +
+                slotLabel +
+                '\n\nRequest ID: ' +
+                appointmentId
+        );
+    });
+
+    renderWeek();
+    renderSlots();
+})();
+</script>
+
+</body>
+</html>

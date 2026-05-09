@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Student Hub — GuidanceConnect</title>
+    <link rel="stylesheet" href="studentpagestyle.css">
+</head>
+<body class="student-page">
+
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="index.html" aria-label="GuidanceConnect home">
+                <img src="logo2.png" alt="" class="brand-logo" width="44" height="44">
+                <span class="brand-text">GuidanceConnect</span>
+            </a>
+            <nav class="header-actions" aria-label="Account">
+                <span class="header-greet">Welcome, <span id="header-student-name" class="header-student-name">Student</span></span>
+                <button type="button" id="btn-logout" class="btn-logout">Logout</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-wrap" id="main">
+        <section class="hero" aria-labelledby="hero-heading">
+            <h1 id="hero-heading">You’re supported here</h1>
+            <p class="hero-lead">
+                This is a private, school-approved place to reach counseling staff and schedule a visit.
+                What you share is treated with care and only seen by authorized personnel.
+            </p>
+        </section>
+
+        <p class="trust-strip" role="status">
+            <span class="trust-icon" aria-hidden="true">✓</span>
+            Confidential counseling channel · Secure sign-in · WLC Guidance Office
+        </p>
+
+        <div class="dashboard-grid">
+            <section class="panel panel-chat" aria-labelledby="chat-heading">
+                <div class="panel-head">
+                    <div>
+                        <h2 id="chat-heading">Message the office</h2>
+                        <p class="panel-sub">Chat with an admin or counselor. Replies during office hours.</p>
+                    </div>
+                    <span class="badge badge-safe">Private</span>
+                </div>
+
+                <div class="chat-hint">
+                    You can share as much or as little as you need. If you’re in crisis, please also use your campus emergency resources.
+                </div>
+
+                <div class="chat-thread" id="chat-thread" role="log" aria-live="polite" aria-relevant="additions"></div>
+
+                <form class="chat-compose" id="chat-form" novalidate>
+                    <label class="sr-only" for="chat-input">Your message</label>
+                    <textarea id="chat-input" class="chat-input" rows="2" placeholder="Type your message…" required autocomplete="off"></textarea>
+                    <button type="submit" class="btn btn-send">Send message</button>
+                    <button type="button" id="btn-clear-chat" class="btn btn-clear">Clear messages</button>
+                </form>
+            </section>
+
+            <aside class="panel panel-next" aria-labelledby="next-heading">
+                <div class="panel-head panel-head--simple">
+                    <h2 id="next-heading">Next step</h2>
+                </div>
+                <p class="next-copy">
+                    Prefer a set time to talk? Booking puts you on the calendar—no pressure, you choose what works.
+                </p>
+                <a class="btn btn-book" href="./booking.html">Book an appointment</a>
+                <button type="button" class="btn btn-approved is-disabled" id="btn-approved-appointment" disabled>Approved Appointment</button>
+                <button type="button" class="btn btn-remove-appointment is-disabled" id="btn-remove-appointment" disabled>Remove Booked Appointment</button>
+                <p class="approval-note" id="approval-note">Approved appointments from the guidance counselor will appear here.</p>
+            </aside>
+        </div>
+    </main>
+
+    <div class="modal-backdrop" id="cancel-modal" hidden>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="cancel-modal-title">
+            <h2 id="cancel-modal-title">Cancel Appointment</h2>
+            <p class="modal-copy">Tell the guidance counselor why you want to cancel this appointment.</p>
+            <label class="modal-label" for="cancel-reason">Reason for canceling</label>
+            <textarea id="cancel-reason" class="modal-textarea" rows="4" placeholder="Write your reason here..."></textarea>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-modal-cancel" id="btn-cancel-close">Close</button>
+                <button type="button" class="btn btn-modal-send" id="btn-cancel-send">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer">
+        <p>Protected by WLC IT Department · Need help? Contact your guidance office.</p>
+    </footer>
+
+    <script src="auth.js"></script>
+    <script>
+    (function () {
+        var nameEl = document.getElementById('header-student-name');
+        var logoutBtn = document.getElementById('btn-logout');
+        var session = typeof GCAuth !== 'undefined' ? GCAuth.getSession() : null;
+        if (nameEl && session && session.fullName) {
+            nameEl.textContent = session.fullName;
+        }
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', function () {
+                if (typeof GCAuth !== 'undefined') {
+                    GCAuth.logout();
+                }
+                window.location.replace('./index.html');
+            });
+        }
+    })();
+    </script>
+    <script>
+    (function () {
+        var APPOINTMENTS_KEY = 'guidanceconnect_appointments_v1';
+        var approvalBtn = document.getElementById('btn-approved-appointment');
+        var removeBtn = document.getElementById('btn-remove-appointment');
+        var approvalNote = document.getElementById('approval-note');
+        var cancelModal = document.getElementById('cancel-modal');
+        var cancelReasonInput = document.getElementById('cancel-reason');
+        var cancelCloseBtn = document.getElementById('btn-cancel-close');
+        var cancelSendBtn = document.getElementById('btn-cancel-send');
+        var session = typeof GCAuth !== 'undefined' ? GCAuth.getSession() : null;
+        var studentId = session && session.schoolId ? session.schoolId : null;
+        var activeAppointmentId = null;
+
+        function normalizeStatus(statusValue) {
+            var normalized = String(statusValue || 'pending').toLowerCase();
+            if (normalized === 'approve') normalized = 'approved';
+            if (normalized === 'decline') normalized = 'declined';
+            if (normalized === 'cancelled') normalized = 'canceled';
+            if (normalized !== 'pending' && normalized !== 'approved' && normalized !== 'declined' && normalized !== 'rescheduled' && normalized !== 'canceled') {
+                normalized = 'pending';
+            }
+            return normalized;
+        }
+
+        function normalizeAppointment(item, index) {
+            if (!item || typeof item !== 'object') return null;
+            return {
+                appointmentId: item.appointmentId || item.requestId || item.id || ('apt_legacy_' + index),
+                studentId: item.studentId || item.schoolId || item.studentNumber || '',
+                studentName: item.studentName || item.fullName || item.student || item.name || 'Student',
+                date: item.date || item.requestedDate || item.appointmentDate || '',
+                time: item.time || item.requestedTime || item.appointmentTime || '',
+                concern: item.concern || item.concernText || item.description || item.details || '',
+                cancellationReason: item.cancellationReason || item.cancelReason || '',
+                canceledAt: item.canceledAt || null,
+                createdAt: item.createdAt || item.requestedAt || item.submittedAt || new Date().toISOString(),
+                updatedAt: item.updatedAt || item.modifiedAt || null,
+                approvedAt: item.approvedAt || null,
+                status: normalizeStatus(item.status)
+            };
+        }
+
+        function getAppointments() {
+            try {
+                var raw = localStorage.getItem(APPOINTMENTS_KEY);
+                var parsed = raw ? JSON.parse(raw) : [];
+                var list = Array.isArray(parsed) ? parsed : Object.keys(parsed || {}).map(function (key) { return parsed[key]; });
+                var normalized = list
+                    .map(function (item, index) { return normalizeAppointment(item, index); })
+                    .filter(function (item) { return !!item; });
+                localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(normalized));
+                return normalized;
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function formatReadableDate(dateStr) {
+            if (!dateStr || typeof dateStr !== 'string') return 'your selected date';
+            var parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            var dt = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+            if (isNaN(dt.getTime())) return dateStr;
+            return dt.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        }
+
+        function saveAppointments(list) {
+            localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(list));
+        }
+
+        function openCancelModal(appt) {
+            activeAppointmentId = appt ? appt.appointmentId : null;
+            cancelReasonInput.value = '';
+            cancelModal.hidden = false;
+            cancelReasonInput.focus();
+        }
+
+        function closeCancelModal() {
+            cancelModal.hidden = true;
+            cancelReasonInput.value = '';
+            activeAppointmentId = null;
+        }
+
+        function setRemoveState(appt) {
+            removeBtn.disabled = false;
+            removeBtn.classList.remove('is-disabled');
+            removeBtn.onclick = function () {
+                openCancelModal(appt);
+            };
+        }
+
+        function setApprovedState(appt) {
+            approvalBtn.disabled = false;
+            approvalBtn.classList.remove('is-disabled');
+            approvalBtn.textContent = 'Approved Appointment';
+            approvalNote.textContent = 'Your appointment for ' + formatReadableDate(appt.date) + ' at ' + (appt.time || 'your selected time') + ' has been approved by the guidance counselor.';
+            approvalBtn.onclick = function () {
+                window.alert(
+                    'Approved appointment\n\n' +
+                    'Date: ' + formatReadableDate(appt.date) + '\n' +
+                    'Time: ' + (appt.time || '—') + '\n' +
+                    'Concern: ' + (appt.concern || 'Private concern')
+                );
+            };
+            setRemoveState(appt);
+        }
+
+        function setPendingState(appt) {
+            approvalBtn.disabled = true;
+            approvalBtn.classList.add('is-disabled');
+            approvalBtn.textContent = 'Appointment Pending';
+            approvalBtn.onclick = null;
+            approvalNote.textContent = 'Your appointment request for ' + formatReadableDate(appt.date) + ' at ' + (appt.time || 'your selected time') + ' is still waiting for counselor approval.';
+            setRemoveState(appt);
+        }
+
+        function setEmptyState() {
+            approvalBtn.disabled = true;
+            approvalBtn.classList.add('is-disabled');
+            approvalBtn.textContent = 'Approved Appointment';
+            approvalBtn.onclick = null;
+            removeBtn.disabled = true;
+            removeBtn.classList.add('is-disabled');
+            removeBtn.onclick = null;
+            approvalNote.textContent = 'Approved appointments from the guidance counselor will appear here.';
+        }
+
+        function renderAppointmentStatus() {
+            if (!approvalBtn || !removeBtn || !approvalNote || !studentId) return;
+            var appointments = getAppointments()
+                .filter(function (appt) { return appt.studentId === studentId; })
+                .sort(function (a, b) {
+                    return new Date(b.approvedAt || b.updatedAt || b.createdAt || 0).getTime() -
+                        new Date(a.approvedAt || a.updatedAt || a.createdAt || 0).getTime();
+                });
+
+            var approved = appointments.find(function (appt) { return appt.status === 'approved'; });
+            if (approved) {
+                setApprovedState(approved);
+                return;
+            }
+
+            var pending = appointments.find(function (appt) { return appt.status === 'pending' || appt.status === 'rescheduled'; });
+            if (pending) {
+                setPendingState(pending);
+                return;
+            }
+
+            setEmptyState();
+        }
+
+        closeCancelModal();
+        renderAppointmentStatus();
+
+        window.addEventListener('storage', function (e) {
+            if (e.key === APPOINTMENTS_KEY) {
+                renderAppointmentStatus();
+            }
+        });
+
+        if (cancelCloseBtn) {
+            cancelCloseBtn.addEventListener('click', closeCancelModal);
+        }
+
+        if (cancelModal) {
+            cancelModal.addEventListener('click', function (e) {
+                if (e.target === cancelModal) {
+                    closeCancelModal();
+                }
+            });
+        }
+
+        if (cancelSendBtn) {
+            cancelSendBtn.addEventListener('click', function () {
+                var reason = (cancelReasonInput.value || '').trim();
+                var appointments;
+                var updated = false;
+
+                if (!activeAppointmentId) return;
+                if (!reason) {
+                    window.alert('Please enter your reason for canceling the appointment.');
+                    cancelReasonInput.focus();
+                    return;
+                }
+
+                appointments = getAppointments().map(function (item) {
+                    if (item.appointmentId === activeAppointmentId) {
+                        item.status = 'canceled';
+                        item.canceledAt = new Date().toISOString();
+                        item.cancellationReason = reason;
+                        item.updatedAt = new Date().toISOString();
+                        updated = true;
+                    }
+                    return item;
+                });
+
+                if (!updated) {
+                    window.alert('Unable to find the appointment to cancel.');
+                    closeCancelModal();
+                    renderAppointmentStatus();
+                    return;
+                }
+
+                saveAppointments(appointments);
+                closeCancelModal();
+                renderAppointmentStatus();
+                window.alert('Your cancellation request has been sent.');
+            });
+        }
+    })();
+    </script>
+    <script>
+    (function () {
+        var form = document.getElementById('chat-form');
+        var input = document.getElementById('chat-input');
+        var thread = document.getElementById('chat-thread');
+        var CHAT_KEY = 'guidanceconnect_chat_v1';
+        var clearBtn = document.getElementById('btn-clear-chat');
+        var session = typeof GCAuth !== 'undefined' ? GCAuth.getSession() : null;
+        var studentId = session && session.schoolId ? session.schoolId : 'guest-student';
+        var studentName = session && session.fullName ? session.fullName : 'Student';
+
+        function nowLabel(dateValue) {
+            var d = dateValue ? new Date(dateValue) : new Date();
+            return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        }
+
+        function getThreads() {
+            try {
+                var raw = localStorage.getItem(CHAT_KEY);
+                return raw ? JSON.parse(raw) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveThreads(threads) {
+            localStorage.setItem(CHAT_KEY, JSON.stringify(threads));
+        }
+
+        function ensureThread() {
+            var threads = getThreads();
+            if (!threads[studentId]) {
+                threads[studentId] = {
+                    schoolId: studentId,
+                    studentName: studentName,
+                    messages: []
+                };
+            }
+            if (!threads[studentId].messages || !threads[studentId].messages.length) {
+                threads[studentId].messages = [
+                    {
+                        sender: 'staff',
+                        text: 'Hello - we are glad you are here. This conversation is confidential within normal counseling practice. How can we help you today?',
+                        at: new Date().toISOString()
+                    }
+                ];
+            }
+            threads[studentId].studentName = studentName;
+            saveThreads(threads);
+            return threads[studentId];
+        }
+
+        function makeMessageNode(msg) {
+            var isStaff = msg.sender === 'staff';
+            var wrap = document.createElement('div');
+            wrap.className = 'msg ' + (isStaff ? 'msg-staff' : 'msg-you');
+            wrap.innerHTML =
+                '<span class="msg-label"></span>' +
+                '<p class="msg-body"></p>' +
+                '<time class="msg-time"></time>';
+            wrap.querySelector('.msg-label').textContent = isStaff ? 'Guidance Office' : 'You';
+            wrap.querySelector('.msg-body').textContent = msg.text;
+            wrap.querySelector('.msg-time').textContent = nowLabel(msg.at);
+            return wrap;
+        }
+
+        function renderThread() {
+            var threads = getThreads();
+            var t = threads[studentId];
+            thread.innerHTML = '';
+            if (!t || !t.messages) return;
+            t.messages.forEach(function (m) {
+                thread.appendChild(makeMessageNode(m));
+            });
+            thread.scrollTop = thread.scrollHeight;
+        }
+
+        function sendMessage(text) {
+            var threads = getThreads();
+            if (!threads[studentId]) {
+                threads[studentId] = { schoolId: studentId, studentName: studentName, messages: [] };
+            }
+            threads[studentId].studentName = studentName;
+            threads[studentId].messages.push({
+                sender: 'student',
+                text: text,
+                at: new Date().toISOString()
+            });
+            saveThreads(threads);
+            renderThread();
+        }
+
+        ensureThread();
+        renderThread();
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function () {
+                var ok = window.confirm('Clear chat messages for this student conversation?');
+                if (!ok) return;
+                var threads = getThreads();
+                if (!threads[studentId]) {
+                    threads[studentId] = { schoolId: studentId, studentName: studentName, messages: [] };
+                }
+                threads[studentId].messages = [];
+                saveThreads(threads);
+                ensureThread();
+                renderThread();
+            });
+        }
+
+        window.addEventListener('storage', function (e) {
+            if (e.key === CHAT_KEY) {
+                ensureThread();
+                renderThread();
+            }
+        });
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var text = (input.value || '').trim();
+            if (!text) return;
+            sendMessage(text);
+            input.value = '';
+        });
+    })();
+    </script>
+</body>
+</html>

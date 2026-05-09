@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GuidanceConnect</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="landing-page">
+
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="index.html" aria-label="GuidanceConnect home">
+                <img src="logo2.png" alt="" class="brand-logo" width="44" height="44">
+                <span class="brand-text">GuidanceConnect</span>
+            </a>
+            <nav class="header-actions" aria-label="Primary">
+                <a class="nav-link" href="#about">About</a>
+                <a class="nav-link" href="#access">Access</a>
+                <a class="btn btn-nav" href="register.html">Register</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-wrap">
+        <section class="hero-section">
+            <div class="hero-copy">
+                <p class="hero-eyebrow">Secure Student Support</p>
+                <h1>Counseling access that feels clear, private, and welcoming.</h1>
+                <p class="hero-lead">
+                    GuidanceConnect helps students and staff manage counseling conversations and appointment requests
+                    in one school-approved space.
+                </p>
+
+                <p class="trust-strip" role="status">
+                    <span class="trust-icon" aria-hidden="true">+</span>
+                    Confidential messaging, appointment booking, and school-managed access
+                </p>
+
+            </div>
+
+            <aside class="login-panel" id="access" aria-labelledby="login-heading">
+                <div class="panel-head">
+                    <div>
+                        <h2 id="login-heading">Secure Login</h2>
+                        <p class="panel-sub">Sign in with your student or employee account.</p>
+                    </div>
+                    <span class="badge badge-safe">Protected</span>
+                </div>
+
+                <div class="panel-body">
+                    <p id="login-message" class="form-message" role="status"></p>
+
+                    <div class="input-box">
+                        <input type="text" id="login-id" placeholder="Student or Employee ID" autocomplete="username">
+                    </div>
+
+                    <div class="input-box">
+                        <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+                    </div>
+
+                    <div class="row">
+                        <label>
+                            <input type="checkbox"> Remember me
+                        </label>
+                        <a href="#">Forgot Password?</a>
+                    </div>
+
+                    <button type="button" class="btn" id="btn-login">Secure Login</button>
+                    <a class="btn btn-secondary btn-register" href="register.html">Register</a>
+                </div>
+            </aside>
+        </section>
+
+        <section class="visitor-chat-panel" aria-labelledby="visitor-chat-heading">
+            <div class="panel-head">
+                <div>
+                    <h2 id="visitor-chat-heading">Message a counselor anonymously</h2>
+                    <p class="panel-sub">Send a message without creating an account or showing your name.</p>
+                </div>
+                <span class="badge badge-safe">Anonymous</span>
+            </div>
+
+            <div class="visitor-chat-body">
+                <div class="visitor-chat-thread" id="visitor-chat-thread" role="log" aria-live="polite" aria-relevant="additions"></div>
+
+                <form class="visitor-chat-compose" id="visitor-chat-form" novalidate>
+                    <label class="sr-only" for="visitor-chat-input">Anonymous message</label>
+                    <textarea id="visitor-chat-input" class="visitor-chat-input" rows="3" placeholder="Type your message for the counselor..." required autocomplete="off"></textarea>
+                    <div class="visitor-chat-actions">
+                        <button type="submit" class="btn btn-chat-send">Send anonymous message</button>
+                        <p id="visitor-chat-status" class="chat-status" role="status"></p>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section class="info-grid" id="about" aria-label="Platform overview">
+            <article class="info-card">
+                <h2>Anonymous chat</h2>
+                <p>Students can message the counselor without showing who they are, making it easier to ask for help.</p>
+            </article>
+
+            <article class="info-card">
+                <h2>Appointment requests</h2>
+                <p>Booking helps students find an available time quickly while giving staff a simple approval flow.</p>
+            </article>
+
+            <article class="info-card">
+                <h2>Shared school system</h2>
+                <p>Staff and students use one connected experience with the same trusted visual language across pages.</p>
+            </article>
+
+            <article class="info-card">
+                <h2>Application Layer (Backend)</h2>
+                <p>
+                    Handles business logic and system processes, including authentication, scheduling,
+                    and case tracking through PHP using the Laravel Framework.
+                </p>
+            </article>
+
+            <article class="info-card">
+                <h2>Data Layer (Database)</h2>
+                <p>
+                    Stores all system data securely using a MySQL database with encryption for
+                    sensitive records.
+                </p>
+            </article>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>GuidanceConnect for WLC counseling support.</p>
+    </footer>
+
+    <script src="auth.js"></script>
+    <script>
+    (function () {
+        var CHAT_KEY = 'guidanceconnect_chat_v1';
+        var VISITOR_ID_KEY = 'guidanceconnect_visitor_chat_id_v1';
+        var form = document.getElementById('visitor-chat-form');
+        var input = document.getElementById('visitor-chat-input');
+        var thread = document.getElementById('visitor-chat-thread');
+        var status = document.getElementById('visitor-chat-status');
+        var visitorName = 'Anonymous Visitor';
+
+        function getVisitorId() {
+            var existing = localStorage.getItem(VISITOR_ID_KEY);
+            if (existing) return existing;
+            var token = 'anonymous_visitor_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+            localStorage.setItem(VISITOR_ID_KEY, token);
+            return token;
+        }
+
+        var visitorId = getVisitorId();
+
+        function getThreads() {
+            try {
+                var raw = localStorage.getItem(CHAT_KEY);
+                return raw ? JSON.parse(raw) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveThreads(threads) {
+            localStorage.setItem(CHAT_KEY, JSON.stringify(threads));
+        }
+
+        function ensureVisitorThread() {
+            var threads = getThreads();
+            if (!threads[visitorId]) {
+                threads[visitorId] = {
+                    schoolId: visitorId,
+                    studentName: visitorName,
+                    anonymous: true,
+                    messages: []
+                };
+            }
+            threads[visitorId].studentName = visitorName;
+            threads[visitorId].anonymous = true;
+            saveThreads(threads);
+            return threads[visitorId];
+        }
+
+        function timeLabel(value) {
+            var d = value ? new Date(value) : new Date();
+            return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        }
+
+        function makeMessageNode(message) {
+            var isStaff = message.sender === 'staff';
+            var item = document.createElement('div');
+            item.className = 'visitor-msg ' + (isStaff ? 'visitor-msg-staff' : 'visitor-msg-you');
+            item.innerHTML = '<span class="visitor-msg-label"></span><p class="visitor-msg-body"></p><time class="visitor-msg-time"></time>';
+            item.querySelector('.visitor-msg-label').textContent = isStaff ? 'Counselor' : 'Anonymous';
+            item.querySelector('.visitor-msg-body').textContent = message.text;
+            item.querySelector('.visitor-msg-time').textContent = timeLabel(message.at);
+            return item;
+        }
+
+        function renderThread() {
+            var current = getThreads()[visitorId];
+            thread.innerHTML = '';
+            if (!current || !current.messages || !current.messages.length) {
+                var empty = document.createElement('p');
+                empty.className = 'visitor-chat-empty';
+                empty.textContent = 'Your anonymous conversation will appear here.';
+                thread.appendChild(empty);
+                return;
+            }
+            current.messages.forEach(function (message) {
+                thread.appendChild(makeMessageNode(message));
+            });
+            thread.scrollTop = thread.scrollHeight;
+        }
+
+        ensureVisitorThread();
+        renderThread();
+
+        window.addEventListener('storage', function (e) {
+            if (e.key === CHAT_KEY) {
+                ensureVisitorThread();
+                renderThread();
+            }
+        });
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var text = (input.value || '').trim();
+            var threads;
+            if (!text) {
+                status.textContent = 'Please type a message first.';
+                input.focus();
+                return;
+            }
+            threads = getThreads();
+            if (!threads[visitorId]) {
+                threads[visitorId] = { schoolId: visitorId, studentName: visitorName, anonymous: true, messages: [] };
+            }
+            threads[visitorId].studentName = visitorName;
+            threads[visitorId].anonymous = true;
+            threads[visitorId].messages.push({
+                sender: 'student',
+                text: text,
+                at: new Date().toISOString()
+            });
+            saveThreads(threads);
+            input.value = '';
+            status.textContent = 'Message sent anonymously.';
+            renderThread();
+        });
+    })();
+    </script>
+    <script>
+    (function () {
+        var msg = document.getElementById('login-message');
+        var flash = GCAuth.consumeFlash();
+        if (flash) {
+            msg.textContent = flash;
+            msg.classList.add('form-message--success');
+        }
+
+        document.getElementById('btn-login').addEventListener('click', function () {
+            msg.classList.remove('form-message--error', 'form-message--success');
+            var schoolId = document.getElementById('login-id').value;
+            var password = document.getElementById('login-password').value;
+            if (!schoolId.trim() || !password) {
+                msg.textContent = 'Enter your ID and password.';
+                msg.classList.add('form-message--error');
+                return;
+            }
+            msg.textContent = '';
+            GCAuth.login(schoolId, password).then(function (res) {
+                if (!res.ok) {
+                    msg.textContent = res.error;
+                    msg.classList.add('form-message--error');
+                    return;
+                }
+                if (res.user.role === 'admin') {
+                    window.location.href = 'adminpage.html';
+                } else if (res.user.role === 'employee') {
+                    window.location.href = 'counselorpage.html';
+                } else {
+                    window.location.href = 'studentpage.html';
+                }
+            });
+        });
+    })();
+    </script>
+</body>
+</html>

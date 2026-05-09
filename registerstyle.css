@@ -1,0 +1,248 @@
+/* GuidanceConnect — Register (matches login / index styling) */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+body {
+    background: linear-gradient(165deg, #edf3fa 0%, #e4edf7 48%, #f7f9fc 100%);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 28px 16px 40px;
+    position: relative;
+    isolation: isolate;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: url("background.png") center / cover no-repeat;
+    filter: blur(2px);
+    transform: scale(1.06);
+    z-index: -2;
+    pointer-events: none;
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(237, 243, 250, 0.72);
+    z-index: -1;
+    pointer-events: none;
+}
+
+body .container {
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.container {
+    text-align: center;
+    width: 100%;
+    max-width: 430px;
+    background: #ffffff;
+    border-radius: 18px;
+    border: 1px solid #d8e4ef;
+    box-shadow: 0 18px 42px rgba(26, 43, 60, 0.12);
+    padding: 30px 28px 24px;
+}
+
+.page-logos {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.logo-left {
+    position: absolute;
+    right: 138px;
+    bottom: 24px;
+    width: auto;
+    height: 88px;
+}
+
+.logo-right {
+    position: absolute;
+    right: 24px;
+    bottom: 24px;
+    width: auto;
+    height: 106px;
+}
+
+@media (max-width: 980px) {
+    .page-logos {
+        display: none;
+    }
+}
+
+h1 {
+    color: #1e8a84;
+    font-size: clamp(1.9rem, 4.5vw, 2.2rem);
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+}
+
+.subtitle {
+    font-size: 0.92rem;
+    color: #4a5d6f;
+    margin-bottom: 18px;
+    line-height: 1.45;
+}
+
+.form-message {
+    font-size: 14px;
+    line-height: 1.4;
+    margin-bottom: 14px;
+    text-align: left;
+}
+
+.form-message[hidden] {
+    display: none !important;
+}
+
+.form-message--error {
+    color: #b00020;
+}
+
+.form-message--success {
+    color: #2c6e6b;
+}
+
+.register-form {
+    text-align: left;
+}
+
+.input-box {
+    width: 100%;
+    margin-bottom: 15px;
+}
+
+.input-box input,
+.input-select {
+    width: 100%;
+    padding: 13px 14px;
+    border-radius: 10px;
+    border: 1px solid #cfdbe8;
+    background: #fcfdff;
+    font-size: 0.96rem;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input-box input:focus,
+.input-select:focus {
+    border-color: #1e8a84;
+    box-shadow: 0 0 0 3px rgba(30, 138, 132, 0.14);
+}
+
+.input-select-wrap {
+    text-align: left;
+}
+
+.select-label {
+    display: block;
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 6px;
+}
+
+.input-select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23444' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+}
+
+.row {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    font-size: 14px;
+    margin-bottom: 18px;
+    color: #555;
+}
+
+.row-agree {
+    text-align: left;
+}
+
+.agree-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    cursor: pointer;
+    line-height: 1.35;
+}
+
+.agree-label input {
+    margin-top: 3px;
+    flex-shrink: 0;
+}
+
+.btn {
+    width: 100%;
+    padding: 13px;
+    background: linear-gradient(135deg, #1e8a84 0%, #2c6e6b 100%);
+    border: none;
+    color: white;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: 11px;
+    cursor: pointer;
+    box-shadow: 0 10px 22px rgba(30, 138, 132, 0.32);
+    transition: opacity 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.btn:hover {
+    opacity: 0.96;
+    box-shadow: 0 12px 24px rgba(30, 138, 132, 0.38);
+}
+
+.btn:active {
+    transform: scale(0.99);
+}
+
+.btn-back {
+    display: block;
+    margin-top: 11px;
+    background: #fff;
+    color: #1e8a84;
+    border: 2px solid #1e8a84;
+    text-decoration: none;
+    text-align: center;
+    font-size: 0.98rem;
+    line-height: 1.2;
+    box-shadow: none;
+}
+
+.btn-back:hover {
+    background: rgba(30, 138, 132, 0.08);
+    opacity: 1;
+}
+
+.footer {
+    margin-top: 22px;
+    font-size: 13px;
+    color: #666;
+    text-align: center;
+}
+
+
+
+
+
+
+
+

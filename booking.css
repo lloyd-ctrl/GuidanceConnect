@@ -1,0 +1,511 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --ink: #1a2b3c;
+    --ink-soft: #4a5d6f;
+    --surface: #ffffff;
+    --border: #d8e4ef;
+    --accent-blue: #1e8a84;
+    --accent-teal: #1e8a84;
+    --accent-teal-deep: #2c6e6b;
+    --header-bg: #1e8a84;
+    --header-accent: #2c6e6b;
+    --shadow-soft: 0 12px 40px rgba(26, 43, 60, 0.07);
+    font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+body {
+    background: linear-gradient(165deg, #edf3fa 0%, #e4edf7 48%, #f7f9fc 100%);
+    position: relative;
+    isolation: isolate;
+    overflow-x: hidden;
+    color: var(--ink);
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: url("background.png") center / cover no-repeat;
+    filter: blur(2px);
+    transform: scale(1.06);
+    z-index: -2;
+    pointer-events: none;
+}
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: rgba(237, 243, 250, 0.72);
+    z-index: -1;
+    pointer-events: none;
+}
+
+body.page-booking {
+    min-height: 100vh;
+    background: transparent;
+}
+
+.site-header {
+    background: linear-gradient(135deg, var(--header-bg) 0%, var(--header-accent) 100%);
+    color: #e8f0fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 24px rgba(15, 35, 60, 0.2);
+}
+
+.header-inner {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.15rem;
+}
+
+.brand-logo {
+    display: block;
+    border-radius: 10px;
+    background: #fff;
+    padding: 2px;
+}
+
+.brand-text {
+    letter-spacing: -0.02em;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.header-greet {
+    font-size: 0.9rem;
+    color: rgba(232, 240, 250, 0.9);
+}
+
+.header-student-name {
+    font-weight: 600;
+    color: #fff;
+}
+
+.btn-home,
+.btn-logout {
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font: inherit;
+    font-size: 0.86rem;
+    padding: 6px 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease;
+    text-decoration: none;
+}
+
+.btn-home:hover,
+.btn-logout:hover {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.65);
+}
+
+.main-wrap {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 32px 20px 48px;
+}
+
+.container.booking-container {
+    text-align: center;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.booking-container .logo {
+    width: 140px;
+    margin-bottom: 18px;
+}
+
+h1 {
+    color: #1e8a84;
+    font-size: 36px;
+    margin-bottom: 10px;
+}
+
+.subtitle {
+    font-size: 14px;
+    color: #444;
+    margin-bottom: 25px;
+    line-height: 1.4;
+}
+
+.card {
+    background: #fff;
+    padding: 22px 24px;
+    border-radius: 14px;
+    box-shadow: 0 14px 36px rgba(26, 43, 60, 0.12);
+    border: 1px solid #d8e4ef;
+    text-align: left;
+}
+
+.card h2 {
+    color: #1e8a84;
+    font-size: 22px;
+    margin-bottom: 6px;
+}
+
+.card p {
+    color: #555;
+    font-size: 14px;
+    margin-bottom: 16px;
+    line-height: 1.45;
+}
+
+.textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid #cfdbe8;
+    font-size: 15px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 100px;
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
+.textarea:focus {
+    outline: none;
+    border-color: #1e8a84;
+    box-shadow: 0 0 0 2px rgba(30, 138, 132, 0.15);
+}
+
+.booking-card label {
+    display: block;
+    margin-top: 18px;
+    font-size: 14px;
+    color: #333;
+}
+
+.booking-intro {
+    margin-bottom: 20px !important;
+}
+
+.booking-section {
+    margin-bottom: 22px;
+}
+
+.booking-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #1e8a84;
+    margin-bottom: 10px;
+    border-bottom: 2px solid #e0eaf5;
+    padding-bottom: 8px;
+}
+
+.calendar-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.cal-nav {
+    background: none;
+    border: none;
+    color: #1e8a84;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 6px;
+    border-radius: 6px;
+    font-family: inherit;
+}
+
+.cal-nav:hover {
+    background: rgba(30, 138, 132, 0.1);
+}
+
+.cal-nav:focus-visible {
+    outline: 2px solid #1e8a84;
+    outline-offset: 2px;
+}
+
+.cal-range {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+}
+
+.calendar-table-wrap {
+    border-radius: 8px;
+    border: 1px solid #d8e2ec;
+    overflow: hidden;
+    background: #fff;
+}
+
+.calendar-grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 13px;
+}
+
+.calendar-grid thead th {
+    background: #1e8a84;
+    color: #fff;
+    font-weight: 600;
+    padding: 10px 4px;
+    text-align: center;
+    border: 1px solid #174a8c;
+}
+
+.calendar-grid tbody td {
+    padding: 6px;
+    text-align: center;
+    vertical-align: middle;
+    border: 1px solid #e8eef5;
+    background: #fafbfd;
+}
+
+.cal-day-btn {
+    width: 100%;
+    min-height: 40px;
+    border: none;
+    border-radius: 6px;
+    background: #fff;
+    color: #222;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.cal-day-btn:hover:not(:disabled) {
+    background: #e8f2fc;
+    color: #1e8a84;
+}
+
+.cal-day-btn.is-selected {
+    background: #1e8a84;
+    color: #fff;
+    box-shadow: inset 0 0 0 2px #174a8c;
+}
+
+.cal-day-btn.is-muted {
+    background: #eef1f5;
+    color: #9aa5b1;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.cal-day-btn:focus-visible {
+    outline: 2px solid #1e8a84;
+    outline-offset: 2px;
+}
+
+.cal-selected-label {
+    font-size: 13px;
+    color: #555;
+    margin-top: 12px;
+    margin-bottom: 0;
+}
+
+.slot-table-wrap {
+    border-radius: 8px;
+    border: 1px solid #d8e2ec;
+    overflow: hidden;
+    background: #fff;
+}
+
+/* Landscape time selection */
+
+.slots-landscape-wrap {
+    border-radius: 8px;
+    border: 1px solid #d8e2ec;
+    background: #fff;
+    padding: 14px 12px;
+}
+
+.slots-landscape {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    justify-content: center;
+}
+
+.slot-btn {
+    min-width: 110px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #1e8a84;
+    background: #fff;
+    color: #1e8a84;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.slot-btn:hover:not(:disabled) {
+    background: rgba(30, 138, 132, 0.12);
+}
+
+.slot-btn.is-selected {
+    background: linear-gradient(to right, #1e8a84, #2c6e6b);
+    color: #fff;
+    border-color: transparent;
+}
+
+.slot-btn.is-booked {
+    border-color: #e0e8f2;
+    background: #f8f9fb;
+    color: #9aa5b1;
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+.slot-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.slot-table thead th {
+    background: #f0f4f9;
+    color: #1e8a84;
+    font-weight: 600;
+    text-align: left;
+    padding: 12px 16px;
+    border-bottom: 2px solid #d8e2ec;
+}
+
+.slot-table thead th:last-child {
+    text-align: center;
+    width: 140px;
+}
+
+.slot-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e8eef5;
+    vertical-align: middle;
+}
+
+.slot-table tbody td:last-child {
+    text-align: center;
+}
+
+.slot-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.slot-row.is-available:hover {
+    background: #f8fbff;
+}
+
+.slot-row.is-slot-selected {
+    background: #e8f4fc;
+}
+
+.slot-time {
+    font-weight: 600;
+    color: #222;
+    font-variant-numeric: tabular-nums;
+}
+
+.slot-row.is-booked .slot-time {
+    color: #888;
+}
+
+.slot-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.slot-badge-booked {
+    background: #fdecea;
+    color: #c62828;
+}
+
+.slot-pick {
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: 1px solid #1e8a84;
+    background: #fff;
+    color: #1e8a84;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.slot-pick:hover {
+    background: rgba(30, 138, 132, 0.12);
+}
+
+.slot-row.is-slot-selected .slot-pick {
+    background: linear-gradient(to right, #1e8a84, #2c6e6b);
+    color: #fff;
+    border-color: transparent;
+}
+
+.slot-pick:focus-visible {
+    outline: 2px solid #1e8a84;
+    outline-offset: 2px;
+}
+
+.btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(to right, #1e8a84, #2c6e6b);
+    border: none;
+    color: white;
+    font-size: 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.3s;
+    margin-top: 16px;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.footer {
+    margin-top: 20px;
+    font-size: 13px;
+    color: #666;
+}
+
+

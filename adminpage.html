@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Dashboard - GuidanceConnect</title>
+    <link rel="stylesheet" href="adminpagestyle.css">
+</head>
+<body class="admin-page">
+
+    <header class="site-header">
+        <div class="header-inner">
+            <a class="brand" href="adminpage.html" aria-label="GuidanceConnect admin dashboard">
+                <img src="logo2.png" alt="" class="brand-logo" width="44" height="44">
+                <span class="brand-text">GuidanceConnect</span>
+            </a>
+            <div class="header-meta">
+                <span class="role-pill">Admin</span>
+                <span class="header-note">System administration</span>
+                <a class="btn-nav" href="counselorpage.html">Counselor Dashboard</a>
+                <button type="button" class="btn-nav" id="btn-logout">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-wrap">
+        <section class="page-intro" aria-labelledby="admin-heading">
+            <h1 id="admin-heading">Admin Dashboard</h1>
+            <p class="intro-lead">Manage users, monitor activity, generate reports, and maintain system security.</p>
+        </section>
+
+        <section class="flow-panel" aria-labelledby="admin-flow-heading">
+            <div class="flow-head">
+                <div>
+                    <h2 id="admin-flow-heading">Admin Flow</h2>
+                    <p>Core administration controls for GuidanceConnect.</p>
+                </div>
+                <span class="badge">System</span>
+            </div>
+            <ol class="flow-list">
+                <li>Manage users</li>
+                <li>Monitor system activities</li>
+                <li>Generate reports</li>
+                <li>Maintain system security</li>
+            </ol>
+        </section>
+
+        <section class="metric-grid" aria-label="System summary">
+            <article class="metric-card">
+                <span class="metric-label">Users</span>
+                <strong id="metric-users">0</strong>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Appointments</span>
+                <strong id="metric-appointments">0</strong>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Messages</span>
+                <strong id="metric-messages">0</strong>
+            </article>
+            <article class="metric-card">
+                <span class="metric-label">Security Events</span>
+                <strong id="metric-security">0</strong>
+            </article>
+        </section>
+
+        <div class="admin-grid">
+            <section class="panel" aria-labelledby="users-heading">
+                <div class="panel-head">
+                    <h2 id="users-heading">Manage Users</h2>
+                    <span class="badge">Accounts</span>
+                </div>
+
+                <form class="admin-form" id="user-form">
+                    <div class="form-row">
+                        <label for="user-name">Full name</label>
+                        <input type="text" id="user-name" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="user-id">ID</label>
+                        <input type="text" id="user-id" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="user-email">Email</label>
+                        <input type="email" id="user-email" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="user-role">Role</label>
+                        <select id="user-role" required>
+                            <option value="student">Student</option>
+                            <option value="employee">Counselor</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label for="user-password">Temporary password</label>
+                        <input type="password" id="user-password" minlength="6" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Add user</button>
+                </form>
+
+                <div class="table-wrap">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>ID</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="activity-heading">
+                <div class="panel-head">
+                    <h2 id="activity-heading">Monitor System Activities</h2>
+                    <span class="badge">Live Log</span>
+                </div>
+                <ul class="activity-list" id="activity-list"></ul>
+            </section>
+
+            <section class="panel" aria-labelledby="reports-heading">
+                <div class="panel-head">
+                    <h2 id="reports-heading">Generate Reports</h2>
+                    <span class="badge">Summary</span>
+                </div>
+                <p class="panel-copy">Create a snapshot report of users, appointments, messages, and case workflow data.</p>
+                <button type="button" class="btn-primary" id="btn-generate-report">Generate report</button>
+                <pre class="report-output" id="report-output">No report generated yet.</pre>
+            </section>
+
+            <section class="panel" aria-labelledby="security-heading">
+                <div class="panel-head">
+                    <h2 id="security-heading">Maintain System Security</h2>
+                    <span class="badge">Security</span>
+                </div>
+                <div class="security-actions">
+                    <button type="button" class="btn-secondary" id="btn-security-check">Run security check</button>
+                    <button type="button" class="btn-secondary" id="btn-clear-anonymous">Clear anonymous visitor chats</button>
+                </div>
+                <ul class="security-list" id="security-list"></ul>
+            </section>
+        </div>
+
+        <p class="admin-status" id="admin-status" role="status"></p>
+    </main>
+
+    <footer class="site-footer">
+        <p>Protected by WLC IT Department - Admin use only</p>
+    </footer>
+
+    <script src="auth.js"></script>
+    <script>
+    (function () {
+        var session = window.GCAuth && window.GCAuth.getSession ? window.GCAuth.getSession() : null;
+        if (!session) {
+            window.location.href = 'index.html';
+            return;
+        }
+        if (session.role !== 'admin') {
+            window.location.href = session.role === 'employee' ? 'counselorpage.html' : 'studentpage.html';
+            return;
+        }
+
+        var ACCOUNTS_KEY = 'guidanceconnect_accounts_v1';
+        var APPOINTMENTS_KEY = 'guidanceconnect_appointments_v1';
+        var CHAT_KEY = 'guidanceconnect_chat_v1';
+        var FLOW_KEY = 'guidanceconnect_counselor_flow_v1';
+        var ACTIVITY_KEY = 'guidanceconnect_admin_activity_v1';
+
+        var usersTable = document.getElementById('users-table');
+        var userForm = document.getElementById('user-form');
+        var activityList = document.getElementById('activity-list');
+        var securityList = document.getElementById('security-list');
+        var reportOutput = document.getElementById('report-output');
+        var statusEl = document.getElementById('admin-status');
+
+        function readJson(key, fallback) {
+            try {
+                var raw = localStorage.getItem(key);
+                return raw ? JSON.parse(raw) : fallback;
+            } catch (e) {
+                return fallback;
+            }
+        }
+
+        function writeJson(key, value) {
+            localStorage.setItem(key, JSON.stringify(value));
+        }
+
+        function accounts() {
+            return readJson(ACCOUNTS_KEY, []);
+        }
+
+        function saveAccounts(list) {
+            writeJson(ACCOUNTS_KEY, list);
+        }
+
+        function roleLabel(role) {
+            if (role === 'admin') return 'Admin';
+            if (role === 'employee') return 'Counselor';
+            return 'Student';
+        }
+
+        function setStatus(message) {
+            statusEl.textContent = message;
+        }
+
+        function logActivity(action) {
+            var list = readJson(ACTIVITY_KEY, []);
+            list.unshift({
+                action: action,
+                actor: session.fullName || session.schoolId || 'Admin',
+                at: new Date().toISOString()
+            });
+            writeJson(ACTIVITY_KEY, list.slice(0, 50));
+            renderActivity();
+            renderMetrics();
+        }
+
+        function timeLabel(value) {
+            var d = new Date(value);
+            return d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        }
+
+        function renderUsers() {
+            var list = accounts();
+            usersTable.innerHTML = '';
+            if (!list.length) {
+                usersTable.innerHTML = '<tr><td colspan="5">No users yet.</td></tr>';
+                return;
+            }
+            list.forEach(function (user) {
+                var status = user.status || 'active';
+                var tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td></td><td></td><td></td><td></td><td class="table-actions"></td>';
+                tr.children[0].textContent = user.fullName || 'User';
+                tr.children[1].textContent = user.schoolId || '-';
+                tr.children[2].textContent = roleLabel(user.role);
+                tr.children[3].textContent = status === 'suspended' ? 'Suspended' : 'Active';
+
+                if (user.schoolId !== session.schoolId) {
+                    var toggleBtn = document.createElement('button');
+                    toggleBtn.type = 'button';
+                    toggleBtn.className = 'btn-mini';
+                    toggleBtn.textContent = status === 'suspended' ? 'Activate' : 'Suspend';
+                    toggleBtn.addEventListener('click', function () {
+                        toggleUser(user.schoolId, status !== 'suspended');
+                    });
+                    tr.children[4].appendChild(toggleBtn);
+
+                    var deleteBtn = document.createElement('button');
+                    deleteBtn.type = 'button';
+                    deleteBtn.className = 'btn-mini btn-danger';
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.addEventListener('click', function () {
+                        deleteUser(user.schoolId);
+                    });
+                    tr.children[4].appendChild(deleteBtn);
+                } else {
+                    tr.children[4].textContent = 'Current admin';
+                }
+
+                usersTable.appendChild(tr);
+            });
+        }
+
+        function toggleUser(schoolId, shouldSuspend) {
+            var list = accounts().map(function (user) {
+                if (user.schoolId === schoolId) {
+                    user.status = shouldSuspend ? 'suspended' : 'active';
+                }
+                return user;
+            });
+            saveAccounts(list);
+            logActivity((shouldSuspend ? 'Suspended' : 'Activated') + ' user ' + schoolId);
+            setStatus('User status updated.');
+            renderUsers();
+        }
+
+        function deleteUser(schoolId) {
+            if (!window.confirm('Delete this user account?')) return;
+            saveAccounts(accounts().filter(function (user) {
+                return user.schoolId !== schoolId;
+            }));
+            logActivity('Deleted user ' + schoolId);
+            setStatus('User deleted.');
+            renderUsers();
+            renderMetrics();
+        }
+
+        function renderActivity() {
+            var list = readJson(ACTIVITY_KEY, []);
+            activityList.innerHTML = '';
+            if (!list.length) {
+                activityList.innerHTML = '<li>No admin activity yet.</li>';
+                return;
+            }
+            list.slice(0, 12).forEach(function (item) {
+                var li = document.createElement('li');
+                li.innerHTML = '<strong></strong><span></span>';
+                li.querySelector('strong').textContent = item.action;
+                li.querySelector('span').textContent = timeLabel(item.at) + ' by ' + item.actor;
+                activityList.appendChild(li);
+            });
+        }
+
+        function metrics() {
+            var appts = readJson(APPOINTMENTS_KEY, []);
+            var chats = readJson(CHAT_KEY, {});
+            var flow = readJson(FLOW_KEY, { schedules: [], sessions: [], cases: [] });
+            return {
+                users: accounts().length,
+                appointments: Array.isArray(appts) ? appts.length : Object.keys(appts || {}).length,
+                messages: Object.keys(chats || {}).reduce(function (sum, key) {
+                    return sum + (((chats[key] || {}).messages || []).length);
+                }, 0),
+                security: readJson(ACTIVITY_KEY, []).filter(function (item) {
+                    return /security|suspend|activate|delete|clear/i.test(item.action || '');
+                }).length,
+                schedules: (flow.schedules || []).length,
+                sessions: (flow.sessions || []).length,
+                cases: (flow.cases || []).length
+            };
+        }
+
+        function renderMetrics() {
+            var m = metrics();
+            document.getElementById('metric-users').textContent = m.users;
+            document.getElementById('metric-appointments').textContent = m.appointments;
+            document.getElementById('metric-messages').textContent = m.messages;
+            document.getElementById('metric-security').textContent = m.security;
+        }
+
+        function renderSecurity(items) {
+            securityList.innerHTML = '';
+            items.forEach(function (text) {
+                var li = document.createElement('li');
+                li.textContent = text;
+                securityList.appendChild(li);
+            });
+        }
+
+        userForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var data = {
+                fullName: document.getElementById('user-name').value.trim(),
+                schoolId: document.getElementById('user-id').value.trim(),
+                email: document.getElementById('user-email').value.trim(),
+                role: document.getElementById('user-role').value,
+                password: document.getElementById('user-password').value
+            };
+            GCAuth.registerAccount(data).then(function (res) {
+                if (!res.ok) {
+                    setStatus(res.error);
+                    return;
+                }
+                logActivity('Added ' + roleLabel(data.role).toLowerCase() + ' user ' + data.schoolId);
+                setStatus('User added.');
+                userForm.reset();
+                renderUsers();
+                renderMetrics();
+            });
+        });
+
+        document.getElementById('btn-generate-report').addEventListener('click', function () {
+            var m = metrics();
+            var report = [
+                'GuidanceConnect Admin Report',
+                'Generated: ' + new Date().toLocaleString(),
+                '',
+                'Users: ' + m.users,
+                'Appointments: ' + m.appointments,
+                'Messages: ' + m.messages,
+                'Counselor schedules: ' + m.schedules,
+                'Session records: ' + m.sessions,
+                'Case status updates: ' + m.cases,
+                'Security events: ' + m.security
+            ].join('\n');
+            reportOutput.textContent = report;
+            logActivity('Generated system report');
+            setStatus('Report generated.');
+        });
+
+        document.getElementById('btn-security-check').addEventListener('click', function () {
+            var list = accounts();
+            var admins = list.filter(function (user) { return user.role === 'admin' && user.status !== 'suspended'; }).length;
+            var suspended = list.filter(function (user) { return user.status === 'suspended'; }).length;
+            renderSecurity([
+                admins ? 'Admin access available: ' + admins + ' active admin account(s).' : 'Warning: no active admin accounts.',
+                'Suspended accounts: ' + suspended,
+                'Browser storage is active for this local demo.'
+            ]);
+            logActivity('Ran security check');
+            setStatus('Security check complete.');
+        });
+
+        document.getElementById('btn-clear-anonymous').addEventListener('click', function () {
+            if (!window.confirm('Clear all anonymous visitor chats?')) return;
+            var chats = readJson(CHAT_KEY, {});
+            Object.keys(chats).forEach(function (key) {
+                if ((chats[key] && chats[key].anonymous) || key.indexOf('anonymous_visitor_') === 0) {
+                    delete chats[key];
+                }
+            });
+            writeJson(CHAT_KEY, chats);
+            logActivity('Cleared anonymous visitor chats');
+            setStatus('Anonymous visitor chats cleared.');
+            renderMetrics();
+        });
+
+        document.getElementById('btn-logout').addEventListener('click', function () {
+            GCAuth.logout();
+            window.location.href = 'index.html';
+        });
+
+        renderUsers();
+        renderActivity();
+        renderMetrics();
+        renderSecurity(['Security tools ready.']);
+    })();
+    </script>
+</body>
+</html>
